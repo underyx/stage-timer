@@ -10,14 +10,24 @@ struct ControlView: View {
             let layout = wide
                 ? AnyLayout(HStackLayout(alignment: .top, spacing: 0))
                 : AnyLayout(VStackLayout(spacing: 0))
+            let compact = geo.size.width < 600 || geo.size.height < 600
+            let main = VStack(spacing: compact ? 14 : 20) {
+                preview
+                transport
+                DisplayStatus()
+            }
+            .padding(compact ? 16 : 24)
             layout {
-                VStack(spacing: 20) {
-                    preview
-                    transport
-                    DisplayStatus()
+                if wide {
+                    // A landscape iPhone is too short for the preview and controls; let that column scroll.
+                    ViewThatFits(in: .vertical) {
+                        main
+                        ScrollView { main }
+                    }
+                    .frame(maxWidth: geo.size.width * 0.58)
+                } else {
+                    main.fixedSize(horizontal: false, vertical: true)
                 }
-                .padding(24)
-                .frame(maxWidth: wide ? geo.size.width * 0.58 : .infinity)
                 settings
             }
         }
@@ -87,7 +97,7 @@ struct ControlView: View {
 
     private func adjustButton(_ title: String, _ seconds: TimeInterval) -> some View {
         Button { model.adjust(by: seconds) } label: {
-            Text(title).monospacedDigit().frame(maxWidth: .infinity)
+            Text(title).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7).frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
     }
@@ -179,7 +189,7 @@ private struct DisplayStatus: View {
             if kinds.contains(.window) {
                 Button("Close window") { DisplaySceneDelegate.closeWindows() }
                     .buttonStyle(.bordered)
-            } else {
+            } else if UIApplication.shared.supportsMultipleScenes {
                 Button("Open display window") { DisplaySceneDelegate.open() }
                     .buttonStyle(.bordered)
             }
@@ -202,6 +212,9 @@ private struct DisplayStatus: View {
         }
         if kinds.contains(.external) {
             return "The iPad keeps these controls; the screen shows only the timer."
+        }
+        guard UIApplication.shared.supportsMultipleScenes else {
+            return "Connect a display by cable or AirPlay Screen Mirroring and it shows only the timer."
         }
         return "Mirroring screens pick the timer up automatically. With an extended display, open a display window and move it there."
     }
