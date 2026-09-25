@@ -14,9 +14,10 @@ struct ControlView: View {
             let main = VStack(spacing: compact ? 14 : 20) {
                 preview
                 transport
-                DisplayStatus()
+                DisplayStatus(compact: compact)
             }
             .padding(compact ? 16 : 24)
+            .padding(.top, compact ? -16 : 0)
             layout {
                 if wide {
                     // A landscape iPhone is too short for the preview and controls; let that column scroll.
@@ -28,7 +29,7 @@ struct ControlView: View {
                 } else {
                     main.fixedSize(horizontal: false, vertical: true)
                 }
-                settings
+                settings(compact: compact)
             }
         }
         .background(Color(.systemGroupedBackground))
@@ -102,7 +103,7 @@ struct ControlView: View {
         .buttonStyle(.bordered)
     }
 
-    private var settings: some View {
+    private func settings(compact: Bool) -> some View {
         @Bindable var model = model
         return Form {
             Section {
@@ -170,11 +171,14 @@ struct ControlView: View {
         }
         .scrollContentBackground(.hidden)
         .contentMargins(.bottom, 40, for: .scrollContent)
+        .contentMargins(.top, compact ? 4 : nil, for: .scrollContent)
     }
 }
 
 private struct DisplayStatus: View {
     @Environment(TimerModel.self) private var model
+    /// Phones can't spare the second line; the hint only matters until the first display is connected.
+    var compact = false
 
     var body: some View {
         let kinds = Set(model.displays.values)
@@ -183,7 +187,9 @@ private struct DisplayStatus: View {
                 .foregroundStyle(kinds.isEmpty ? Color.secondary : Color.green)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title(kinds)).font(.subheadline.weight(.medium))
-                Text(hint(kinds)).font(.footnote).foregroundStyle(.secondary)
+                if !compact {
+                    Text(hint(kinds)).font(.footnote).foregroundStyle(.secondary)
+                }
             }
             Spacer()
             if kinds.contains(.window) {
