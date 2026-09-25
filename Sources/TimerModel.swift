@@ -1,0 +1,121 @@
+import Observation
+import SwiftUI
+
+/// The one timer every scene renders. Time is derived from wall-clock dates rather than
+/// ticked, so the iPad and the external display can never drift apart.
+@MainActor @Observable
+final class TimerModel {
+    static let shared = TimerModel()
+
+    enum Mode: String, CaseIterable, Identifiable {
+        case countdown = "Countdown"
+        case stopwatch = "Stopwatch"
+        var id: Self { self }
+    }
+
+    enum Phase { case normal, warning, overtime }
+
+    var mode: Mode = .countdown { didSet { reset() } }
+    var duration: TimeInterval = 5 * 60
+    /// Seconds remaining at which the display turns amber; 0 disables it.
+    var warnAt: TimeInterval = 60
+    /// Keep counting up in red past zero instead of stopping at 0:00.
+    var countOvertime = true
+
+    var message = ""
+    var showMessage = false
+    var showClock = false
+    var blackout = false
+
+    /// Connected display scenes, keyed by scene session ID.
+    var displays: [String: DisplayKind] = [:]
+
+    private(set) var startedAt: Date?
+    private var banked: TimeInterval = 0
+
+    var isRunning: Bool { startedAt != nil }
+    var isPristine: Bool { !isRunning && banked == 0 }
+
+    func elapsed(at now: Date) -> TimeInterval {
+        let total = banked + (startedAt.map { now.timeIntervalSince($0) } ?? 0)
+        if mode == .countdown && !countOvertime { return min(total, duration) }
+        return total
+    }
+
+    func toggle() { isRunning ? pause() : start() }
+
+    func start() {
+        guard !isRunning else { return }
+        if mode == .countdown && !countOvertime && banked >= duration { banked = 0 }
+        startedAt = .now
+    }
+
+    func pause() {
+        guard let startedAt else { return }
+        banked += Date.now.timeIntervalSince(startedAt)
+        self.startedAt = nil
+    }
+
+    func reset() {
+        startedAt = nil
+        banked = 0
+    }
+
+    func setDuration(_ seconds: TimeInterval) {
+        reset()
+        duration = seconds
+    }
+
+    /// Shift the countdown target. Running timers keep running; a target pushed below the
+    /// elapsed time simply lands in overtime.
+    func adjust(by seconds: TimeInterval) {
+        if !countOvertime, let startedAt {
+            banked = min(banked + Date.now.timeIntervalSince(startedAt), duration)
+            self.startedAt = .now
+        }
+        duration = max(duration + seconds, 0)
+        if !countOvertime { banked = min(banked, duration) }
+    }
+
+    struct Snapshot {
+        var text: String
+        var phase: Phase
+        /// 0...1 fraction of the countdown used; nil for the stopwatch.
+        var progress: Double?
+        /// Seconds since the countdown hit zero; nil before that.
+        var overtime: TimeInterval?
+    }
+
+    func snapshot(at now: Date) -> Snapshot {
+        let elapsed = elapsed(at: now)
+        switch mode {
+        case .stopwatch:
+            return Snapshot(text: Self.format(Int(elapsed)), phase: .normal, progress: nil, overtime: nil)
+        case .countdown:
+            let remaining = duration - elapsed
+            let progress = duration > 0 ? min(elapsed / duration, 1) : 1
+            if remaining > 0 {
+                // Round up so a fresh 5:00 timer reads 5:00, and 0:00 appears exactly at zero.
+                let phase: Phase = remaining <= warnAt ? .warning : .normal
+                return Snapshot(text: Self.format(Int(remaining.rounded(.up))), phase: phase, progress: progress, overtime: nil)
+            }
+            let over = -remaining
+            let text = Int(over) == 0 ? Self.format(0) : "+" + Self.format(Int(over))
+            return Snapshot(text: text, phase: .overtime, progress: progress, overtime: over)
+        }
+    }
+
+    static func format(_ seconds: Int) -> String {
+        let h = seconds / 3600, m = seconds / 60 % 60, s = seconds % 60
+        return h > 0
+            ? String(format: "%d:%02d:%02d", h, m, s)
+            : String(format: "%d:%02d", m, s)
+    }
+}
+
+enum DisplayKind {
+    /// A physical display in mirroring mode: iPadOS hands us the whole screen.
+    case external
+    /// A regular app window, typically dragged onto an extended display in Stage Manager.
+    case window
+}
