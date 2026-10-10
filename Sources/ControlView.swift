@@ -150,10 +150,7 @@ struct ControlView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(["Wrap up", "5 minutes left", "Questions", "Speak up", "Break"], id: \.self) { text in
-                            Button(text) {
-                                model.message = text
-                                model.showMessage = true
-                            }
+                            Button(text) { model.message = text }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                         }
