@@ -10,8 +10,9 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "7"
-    # PostHog project API key (phc_...). Empty disables analytics entirely.
-    POSTHOG_API_KEY: ""
+    # PostHog project API key, shared with Line Bites (events carry app=stage-timer).
+    # Empty disables analytics entirely.
+    POSTHOG_API_KEY: phc_vUgTnULQdUWDrzsoDfGrBoUz59RY3Z3bSQqvdJukkPt4
 packages:
   PostHog:
     url: https://github.com/PostHog/posthog-ios
