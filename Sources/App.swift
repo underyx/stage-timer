@@ -5,6 +5,14 @@ import UIKit
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        Analytics.setup()
+        return true
+    }
+
+    func application(
+        _ application: UIApplication,
         configurationForConnecting session: UISceneSession,
         options: UIScene.ConnectionOptions
     ) -> UISceneConfiguration {
@@ -68,12 +76,14 @@ final class DisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = FullscreenHostingController(rootView: DisplayView().environment(TimerModel.shared))
         window.makeKeyAndVisible()
         self.window = window
-        TimerModel.shared.displays[session.persistentIdentifier] =
-            session.role == .windowExternalDisplayNonInteractive ? .external : .window
+        let kind: DisplayKind = session.role == .windowExternalDisplayNonInteractive ? .external : .window
+        TimerModel.shared.displays[session.persistentIdentifier] = kind
+        Analytics.capture("display_connected", ["display": kind == .external ? "external" : "window"])
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
         TimerModel.shared.displays[scene.session.persistentIdentifier] = nil
+        Analytics.capture("display_disconnected")
     }
 
     static func open() {

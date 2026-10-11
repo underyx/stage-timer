@@ -32,6 +32,10 @@ final class TimerModel {
 
     private(set) var startedAt: Date?
     private var banked: TimeInterval = 0
+    /// Set once a countdown has run through 80% of itself, the point at which someone was plainly
+    /// using it rather than poking at the app. Reported once per countdown.
+    private var usedReported = false
+    private var usedTask: Task<Void, Never>?
 
     var isRunning: Bool { startedAt != nil }
     var isPristine: Bool { !isRunning && banked == 0 }
@@ -47,18 +51,54 @@ final class TimerModel {
     func start() {
         guard !isRunning else { return }
         if mode == .countdown && !countOvertime && banked >= duration { banked = 0 }
+        let fresh = banked == 0
         startedAt = .now
+        if fresh {
+            Analytics.capture("timer_started", [
+                "display": Analytics.displayKind(displays),
+                "mode": mode.rawValue.lowercased(),
+                "duration_seconds": Int(duration),
+            ])
+        }
+        scheduleUsedCheck()
     }
 
     func pause() {
         guard let startedAt else { return }
         banked += Date.now.timeIntervalSince(startedAt)
         self.startedAt = nil
+        scheduleUsedCheck()
     }
 
     func reset() {
         startedAt = nil
         banked = 0
+        usedReported = false
+        scheduleUsedCheck()
+    }
+
+    /// Time is date-derived, not ticked, so the 80% mark is awaited rather than polled: one task
+    /// per (re)start or duration change, cancelled by pause and reset.
+    private func scheduleUsedCheck() {
+        usedTask?.cancel()
+        usedTask = nil
+        guard mode == .countdown, isRunning, !usedReported, duration > 0 else { return }
+        let wait = duration * 0.8 - elapsed(at: .now)
+        usedTask = Task { [weak self] in
+            if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+            guard !Task.isCancelled else { return }
+            self?.reportUsed()
+        }
+    }
+
+    private func reportUsed() {
+        guard !usedReported, mode == .countdown, isRunning, duration > 0,
+              elapsed(at: .now) >= duration * 0.8 else { return }
+        usedReported = true
+        Analytics.capture("timer_used", [
+            "display": Analytics.displayKind(displays),
+            "duration_seconds": Int(duration),
+        ])
     }
 
     func setDuration(_ seconds: TimeInterval) {
@@ -75,6 +115,7 @@ final class TimerModel {
         }
         duration = max(duration + seconds, 0)
         if !countOvertime { banked = min(banked, duration) }
+        scheduleUsedCheck()
     }
 
     struct Snapshot {
