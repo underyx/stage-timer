@@ -41,7 +41,10 @@ final class TimerModel {
     var isPristine: Bool { !isRunning && banked == 0 }
 
     func elapsed(at now: Date) -> TimeInterval {
-        let total = banked + (startedAt.map { now.timeIntervalSince($0) } ?? 0)
+        // `now` is the frame's TimelineView date, which can predate `startedAt` by up to one tick:
+        // tapping Start re-renders with the current frame's date before the next tick arrives. A
+        // negative elapsed rounded up read 5:01 for that one frame on a fresh 5:00 timer.
+        let total = banked + (startedAt.map { max(now.timeIntervalSince($0), 0) } ?? 0)
         if mode == .countdown && !countOvertime { return min(total, duration) }
         return total
     }
