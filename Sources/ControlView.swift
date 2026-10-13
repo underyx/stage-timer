@@ -144,9 +144,10 @@ struct ControlView: View {
             }
 
             Section("Message") {
+                // Typing, tapping a preset and pressing Done only edit the text; the toggle alone
+                // decides whether the audience sees it.
                 TextField("Shown under the timer", text: $model.message)
                     .submitLabel(.done)
-                    .onSubmit { model.showMessage = !model.message.isEmpty }
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(["Wrap up", "5 minutes left", "Questions", "Speak up", "Break"], id: \.self) { text in
@@ -160,10 +161,15 @@ struct ControlView: View {
                     .disabled(model.message.isEmpty)
             }
 
-            Section("Display") {
+            Section {
                 Toggle("Show clock", isOn: $model.showClock)
                 Toggle("Black out", isOn: $model.blackout)
                     .keyboardShortcut("b", modifiers: [])
+                Toggle("Keep running when locked", isOn: $model.keepRunningWhenLocked)
+            } header: {
+                Text("Display")
+            } footer: {
+                Text("Keeps the connected display counting after the top button is pressed. Off, the display freezes on the last time until the device is unlocked.")
             }
         }
         .scrollContentBackground(.hidden)

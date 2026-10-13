@@ -20,3 +20,9 @@ Bump `CURRENT_PROJECT_VERSION` in `project.yml` before each TestFlight upload.
   leaves the screen mirrored and `UIScreen.screens` shows only the iPad.
 - **Extended display (Stage Manager / Windowed Apps):** there's no dedicated scene; "Open display window"
   opens a second app window to drag onto that screen.
+- **Locking the device:** the top button backgrounds the app, iOS suspends it within seconds, and the
+  external display freezes on the last frame. "Keep running when locked" (off by default) keeps the
+  app alive with a silent, mixed-in audio session while a display is connected (`LockKeepalive`,
+  `UIBackgroundModes: audio`), so the display keeps counting.
+- **Display windows closed in the background** reach `didDiscardSceneSessions`, not
+  `sceneDidDisconnect`; the control scene also prunes `displays` against `openSessions` on activation.
