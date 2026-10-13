@@ -22,6 +22,16 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         let wantsDisplay = options.userActivities.contains { $0.activityType == DisplaySceneDelegate.activityType }
         return UISceneConfiguration(name: wantsDisplay ? "Display" : "Control", sessionRole: session.role)
     }
+
+    /// The user closed windows from the app switcher or Stage Manager. UIKit reports a close this
+    /// way, not through `sceneDidDisconnect`, when the scene was not connected at the time (the
+    /// app was in the background, or not running at all), so without it a display window that was
+    /// closed stayed listed as open until the app was relaunched.
+    func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {
+        for session in sceneSessions {
+            TimerModel.shared.displays[session.persistentIdentifier] = nil
+        }
+    }
 }
 
 final class ControlSceneDelegate: UIResponder, UIWindowSceneDelegate {
@@ -59,6 +69,9 @@ final class ControlSceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidBecomeActive(_ scene: UIScene) {
         // A timer on stage must never let the iPad lock under the operator.
         UIApplication.shared.isIdleTimerDisabled = true
+        // Belt and braces for a display window closed while the app was suspended: whatever the
+        // system reported or skipped, a session that is gone is not a display.
+        TimerModel.shared.pruneDisplays(keeping: Set(UIApplication.shared.openSessions.map(\.persistentIdentifier)))
     }
 }
 
@@ -87,8 +100,11 @@ final class DisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     static func open() {
+        // Bring back a display window the system released in the background rather than
+        // stacking a second one on top of it.
+        let existing = UIApplication.shared.openSessions.first { $0.configuration.name == "Display" }
         let activity = NSUserActivity(activityType: activityType)
-        UIApplication.shared.requestSceneSessionActivation(nil, userActivity: activity, options: nil)
+        UIApplication.shared.requestSceneSessionActivation(existing, userActivity: activity, options: nil)
     }
 
     static func closeWindows() {

@@ -28,7 +28,31 @@ final class TimerModel {
     var blackout = false
 
     /// Connected display scenes, keyed by scene session ID.
-    var displays: [String: DisplayKind] = [:]
+    var displays: [String: DisplayKind] = [:] { didSet { updateKeepalive() } }
+
+    /// Keep counting on a connected display after the top button locks the device. Persisted:
+    /// it is a decision about the room's hardware, not about one show.
+    var keepRunningWhenLocked = UserDefaults.standard.bool(forKey: Self.keepRunningKey) {
+        didSet {
+            UserDefaults.standard.set(keepRunningWhenLocked, forKey: Self.keepRunningKey)
+            updateKeepalive()
+        }
+    }
+    private static let keepRunningKey = "keepRunningWhenLocked"
+
+    private func updateKeepalive() {
+        LockKeepalive.update(enabled: keepRunningWhenLocked, displayConnected: !displays.isEmpty)
+    }
+
+    /// Drop display windows whose scene session no longer exists. A window closed from the app
+    /// switcher or Stage Manager while the app was in the background does not always reach
+    /// `sceneDidDisconnect`; it may only be reported through `didDiscardSceneSessions`, or not at
+    /// all until the sessions are compared on the next activation. Only `.window` entries are
+    /// judged: a mirrored screen's scene is the system's, and it disconnects when the cable does.
+    func pruneDisplays(keeping openSessions: Set<String>) {
+        let stale = displays.filter { $0.value == .window && !openSessions.contains($0.key) }.keys
+        for id in stale { displays[id] = nil }
+    }
 
     private(set) var startedAt: Date?
     private var banked: TimeInterval = 0
