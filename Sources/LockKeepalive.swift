@@ -44,13 +44,12 @@ enum LockKeepalive {
         let sampleRate: UInt32 = 8000
         let dataSize = sampleRate * 2
         var data = Data()
-        func append(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
-        func append(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
-        func append(_ tag: String) { data.append(contentsOf: Array(tag.utf8)) }
-        append("RIFF"); append(UInt32(36 + dataSize)); append("WAVE")
-        append("fmt "); append(UInt32(16)); append(UInt16(1)); append(UInt16(1))
-        append(sampleRate); append(sampleRate * 2); append(UInt16(2)); append(UInt16(16))
-        append("data"); append(dataSize); data.append(Data(count: Int(dataSize)))
+        func u32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
+        func u16(_ v: UInt16) { withUnsafeBytes(of: v.littleEndian) { data.append(contentsOf: $0) } }
+        func tag(_ s: String) { data.append(contentsOf: Array(s.utf8)) }
+        tag("RIFF"); u32(36 + dataSize); tag("WAVE")
+        tag("fmt "); u32(16); u16(1); u16(1); u32(sampleRate); u32(sampleRate * 2); u16(2); u16(16)
+        tag("data"); u32(dataSize); data.append(Data(count: Int(dataSize)))
         return data
     }()
 }
