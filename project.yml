@@ -48,8 +48,9 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         ITSAppUsesNonExemptEncryption: false
         PostHogAPIKey: $(POSTHOG_API_KEY)
+        # The control surface is always dark; a white launch screen is a flash in a dimmed room.
         UILaunchScreen:
-          UIColorName: ""
+          UIColorName: LaunchBackground
         UIRequiresFullScreen: false
         # "Keep running when locked": a silent audio session keeps the app alive after the top
         # button so the external display keeps counting (Sources/LockKeepalive.swift).

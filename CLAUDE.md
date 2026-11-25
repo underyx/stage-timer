@@ -30,7 +30,9 @@ job alone says nothing about the app. Say so in the PR if something merged witho
   observable object the views bind to. Root `Package.swift` builds this folder alone.
 - `Sources/App.swift`, `Analytics.swift`, `LockKeepalive.swift`: the app around it. `App.swift`
   builds `TimerModel.shared` with the real store, PostHog and the keepalive.
-- `Sources/ControlView.swift`, `DisplayView.swift`: the views.
+- `Sources/DisplayView.swift`: what the room sees, also the monitor on the control surface.
+  `Sources/ControlView.swift` lays out the operator's side from the pieces in `Sources/Views/`;
+  `Sources/Theme.swift` holds its colours, its two button styles and its animation curves.
 - `Tests/Core/`: the timer's behaviour, on a clock the test moves by hand. `Tests/App/`: what only
   the built app can answer (Info.plist wiring).
 
@@ -69,6 +71,14 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
 - **Every change to the timer's state goes through `TimerModel.update`.** It saves, re-derives
   `isFinished` and reschedules the wake task; a property written around it is not saved and can
   leave a countdown that never notices it ended.
+- **Nothing on the control surface throws a running timer away on one tap.** Reset is held
+  (`Transport`), and a new length or mode asks first once a run has started. A new control that
+  calls `reset()`, `setDuration` or sets `mode` needs the same guard.
+- **The control surface is always dark and never follows the system appearance** (`Theme`): it is
+  used in dimmed rooms. Colours come from `Theme`, not from system colours or materials.
+- **The display's digits are scaled, not re-set, to make room for a message** (`DisplayView`):
+  a font size does not animate. Their size is worked out for the widest time the run will show,
+  so it does not jump at 9:59; `ems` there is an estimate of SF Rounded's widths.
 - **Saved state decodes all or nothing** (`SavedState`, one JSON value in UserDefaults under
   `state`). A new field in `SavedState` or `TimerState` must be optional, or the update that adds
   it silently resets every user's settings. `TimerState.Mode` raw values are stored and sent to
