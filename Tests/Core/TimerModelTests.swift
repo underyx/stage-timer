@@ -247,6 +247,8 @@ private final class Rig {
         let relaunched = rig.relaunch(after: 3600)
         #expect(relaunched.mode == .stopwatch && !relaunched.isRunning && !relaunched.isPristine)
         #expect(relaunched.snapshot(at: rig.now).text == "0:42")
+        // A paused total is not thrown away for being old.
+        #expect(rig.relaunch(after: 5 * 24 * 3600).snapshot(at: rig.now).text == "0:42")
     }
 
     @Test func aCountdownThatEndedWhileTheAppWasGoneComesBackFinished() {

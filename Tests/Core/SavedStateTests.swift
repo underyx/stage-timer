@@ -55,6 +55,14 @@ private let t0 = Date(timeIntervalSinceReferenceDate: 800_000_000)
         #expect(restored.message == "Wrap up" && restored.showClock)
     }
 
+    @Test func anOldPausedTimeIsKept() {
+        var state = midShow()
+        state.timer.pause(at: t0.addingTimeInterval(90))
+        let restored = state.restored(at: t0.addingTimeInterval(3 * 24 * 3600))
+        #expect(restored.timer == state.timer)
+        #expect(!restored.showMessage && !restored.blackout)
+    }
+
     @Test func aSaveFromTheFutureIsNotTrusted() {
         let state = midShow()
         #expect(state.restored(at: t0.addingTimeInterval(-30)) == state, "a little clock drift is fine")

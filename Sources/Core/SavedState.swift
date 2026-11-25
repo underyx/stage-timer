@@ -6,7 +6,7 @@ import Foundation
 /// for a relaunch to show the countdown as if nothing had happened.
 ///
 /// Two lifetimes live in here. Settings (mode, duration, amber threshold, overtime, the message
-/// text, the clock) always come back. The session (the run itself, and whether the message or
+/// text, the clock) always come back. The session (a running clock, and whether the message or
 /// the blackout is up) comes back only while it is plausibly the same event; see `restored(at:)`.
 ///
 /// Decoding is all or nothing: a value this version cannot read is dropped and the app starts
@@ -24,18 +24,19 @@ struct SavedState: Codable, Equatable, Sendable {
     var blackout = false
 
     /// What a launch at `now` should come back to: everything if the last change was within
-    /// `sessionLifetime`, otherwise the settings with a fresh session. Twelve hours covers a
-    /// conference day, and keeps yesterday's forgotten run from greeting the next morning as
-    /// +14:00:00 in red. A save from the future (the device clock was moved back) is as
-    /// untrustworthy as an old one.
+    /// `sessionLifetime`. Twelve hours covers a conference day. Past that, a clock left running is
+    /// reset, so yesterday's forgotten countdown does not greet the next morning as +14:00:00 in
+    /// red, and the message and blackout come off the display. A paused time is kept however old:
+    /// it misleads nobody, and a stopwatch total may be the thing someone came back for. A save
+    /// from the future (the device clock was moved back) is as untrustworthy as an old one.
     func restored(at now: Date) -> SavedState {
         let age = now.timeIntervalSince(savedAt)
         if age >= -60 && age <= Self.sessionLifetime { return self }
-        var fresh = self
-        fresh.timer.reset()
-        fresh.showMessage = false
-        fresh.blackout = false
-        return fresh
+        var stale = self
+        if stale.timer.isActive { stale.timer.reset() }
+        stale.showMessage = false
+        stale.blackout = false
+        return stale
     }
 }
 
