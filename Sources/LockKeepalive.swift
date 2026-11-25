@@ -9,6 +9,14 @@ import os
 /// venue is playing is interrupted or ducked.
 @MainActor
 enum LockKeepalive {
+    /// Held back from 1.1: the owner wants the first update through App Review without the
+    /// question a background audio mode invites (2026-11-25). While this is false the toggle is
+    /// hidden, nothing plays, and project.yml declares no `UIBackgroundModes`. To ship the option,
+    /// set this to true and restore `UIBackgroundModes: [audio]` in project.yml in the same change;
+    /// either one without the other is a toggle that does nothing or a mode nothing uses
+    /// (Tests/App/AppTests.swift fails on the mismatch).
+    static let isAvailable = false
+
     private static var player: AVAudioPlayer?
     private static var wanted = false
     private static var observing = false
@@ -19,8 +27,8 @@ enum LockKeepalive {
     /// whenever a scene becomes active, which is the one chance to recover from an interruption
     /// that ended while the app was suspended and so was never reported.
     static func set(wanted: Bool) {
-        self.wanted = wanted
-        if wanted {
+        self.wanted = wanted && isAvailable
+        if self.wanted {
             observe()
             start()
         } else {

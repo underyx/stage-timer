@@ -191,6 +191,81 @@ private final class Rig {
     }
 }
 
+/// Putting time already spent on the stopwatch: a rehearsal that started the clock ten minutes
+/// late has to be able to add those minutes, running or not, without losing or doubling a second.
+@MainActor @Suite struct TimerModelStopwatchShiftTests {
+    private func stopwatch() -> Rig {
+        let rig = Rig()
+        rig.model.mode = .stopwatch
+        return rig
+    }
+
+    @Test func aStoppedStopwatchTakesTimeAndStartsFromIt() {
+        let rig = stopwatch()
+        rig.model.shiftElapsed(by: 600)
+        #expect(!rig.model.isRunning && !rig.model.isPristine)
+        #expect(rig.text() == "10:00")
+        rig.model.start()
+        rig.advance(75.5)
+        #expect(rig.text() == "11:15")
+        #expect(rig.names() == [], "time already on the clock makes this a resume, not a start")
+    }
+
+    @Test func aRunningStopwatchJumpsByTheShiftAndKeepsRunning() {
+        let rig = stopwatch()
+        rig.model.start()
+        rig.model.shiftElapsed(by: 600)
+        #expect(rig.model.isRunning)
+        rig.advance(30.5)
+        #expect(rig.text() == "10:30")
+    }
+
+    /// The frame that renders the tap can carry a date from just before it, as on Start: it must
+    /// show the shifted time, not a second less.
+    @Test func aFrameDatedBeforeTheShiftAlreadyShowsIt() {
+        let rig = stopwatch()
+        rig.model.start()
+        rig.advance(20)
+        rig.model.shiftElapsed(by: 600)
+        #expect(rig.model.snapshot(at: rig.now.addingTimeInterval(-0.05)).text == "10:20")
+    }
+
+    @Test func shiftsAddUp() {
+        let rig = stopwatch()
+        rig.model.start()
+        for seconds: TimeInterval in [60, 10, -10, 60] { rig.model.shiftElapsed(by: seconds) }
+        rig.advance(0.5)
+        #expect(rig.text() == "2:00")
+    }
+
+    @Test func removingMoreThanThereIsStopsAtZeroAndKeepsRunning() {
+        let rig = stopwatch()
+        rig.model.start()
+        rig.model.shiftElapsed(by: 600)
+        rig.model.shiftElapsed(by: -3600)
+        #expect(rig.model.isRunning)
+        #expect(rig.model.elapsed(at: rig.now) == 0)
+        rig.advance(5.5)
+        #expect(rig.text() == "0:05")
+    }
+
+    @Test func removingFromAnUntouchedStopwatchLeavesItPristine() {
+        let rig = stopwatch()
+        rig.model.shiftElapsed(by: -60)
+        #expect(rig.model.isPristine)
+        #expect(rig.text() == "0:00")
+    }
+
+    @Test func pausedTimeSurvivesAShiftAndResetClearsIt() {
+        let rig = stopwatch()
+        rig.model.shiftElapsed(by: 90)
+        rig.model.shiftElapsed(by: -30)
+        #expect(rig.text() == "1:00")
+        rig.model.reset()
+        #expect(rig.model.isPristine && rig.text() == "0:00")
+    }
+}
+
 @MainActor @Suite struct TimerModelMessageTests {
     @Test func editingTheMessageNeverShowsIt() {
         let rig = Rig()

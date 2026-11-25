@@ -22,10 +22,12 @@ struct AppTests {
         }
     }
 
-    /// "Keep running when locked" does nothing without the background mode, and says nothing.
-    @Test func theKeepaliveHasItsBackgroundMode() {
-        let modes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String]
-        #expect(modes == ["audio"])
+    /// "Keep running when locked" needs the audio background mode, and the mode needs the option:
+    /// a toggle that silently does nothing one way, a declared mode App Review finds unused the
+    /// other. `LockKeepalive.isAvailable` and project.yml change together or this fails.
+    @Test func theAudioBackgroundModeIsDeclaredExactlyWhenTheKeepaliveShips() {
+        let modes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
+        #expect(modes.contains("audio") == LockKeepalive.isAvailable)
     }
 
     @Test func theDisplayWindowActivityIsDeclared() {

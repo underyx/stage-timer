@@ -74,14 +74,19 @@ struct SetupPanel: View {
                 }
             }
 
+            // "Keep running when locked" exists only in builds that ship its background mode.
             SetupCard(
                 "Screen",
-                footer: "Keeps the connected screen counting after the top button is pressed. Off, the screen freezes on the last time until the device is unlocked.",
+                footer: LockKeepalive.isAvailable
+                    ? "Keeps the connected screen counting after the top button is pressed. Off, the screen freezes on the last time until the device is unlocked."
+                    : nil,
                 fill: cardFill
             ) {
                 Toggle("Show the time of day", isOn: $model.showClock).setupRow()
-                RowDivider()
-                Toggle("Keep running when locked", isOn: $model.keepRunningWhenLocked).setupRow()
+                if LockKeepalive.isAvailable {
+                    RowDivider()
+                    Toggle("Keep running when locked", isOn: $model.keepRunningWhenLocked).setupRow()
+                }
             }
 
             ConnectionCard(fill: cardFill, keyFill: keyFill)
