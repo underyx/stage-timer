@@ -145,6 +145,16 @@ final class TimerModel {
         scheduleUsedCheck()
     }
 
+    /// Shift the time already counted, for a clock that was started late (or early). Works
+    /// mid-run: the running stretch is banked and restarted from now, so the shift lands exactly
+    /// once and a shift below zero stops at 0:00 instead of leaving the clock in debt.
+    func shiftElapsed(by seconds: TimeInterval) {
+        let now = Date.now
+        banked = max(elapsed(at: now) + seconds, 0)
+        if isRunning { startedAt = now }
+        scheduleUsedCheck()
+    }
+
     struct Snapshot {
         var text: String
         var phase: Phase

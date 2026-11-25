@@ -3,6 +3,7 @@ import SwiftUI
 struct ControlView: View {
     @Environment(TimerModel.self) private var model
     @State private var editingDuration = false
+    @State private var shiftingElapsed = false
 
     var body: some View {
         GeometryReader { geo in
@@ -35,6 +36,9 @@ struct ControlView: View {
         .background(Color(.systemGroupedBackground))
         .sheet(isPresented: $editingDuration) {
             DurationPicker(initial: model.duration) { model.setDuration($0) }
+        }
+        .sheet(isPresented: $shiftingElapsed) {
+            DurationPicker(title: "Adjust stopwatch", relative: true, initial: 0) { model.shiftElapsed(by: $0) }
         }
     }
 
@@ -84,23 +88,30 @@ struct ControlView: View {
             }
             .font(.title3.weight(.semibold))
 
-            if model.mode == .countdown {
-                HStack(spacing: 8) {
-                    adjustButton("−1 min", -60)
-                    adjustButton("−10 s", -10)
-                    adjustButton("+10 s", 10)
-                    adjustButton("+1 min", 60)
-                }
+            HStack(spacing: 8) {
+                adjustButton("−1 min", -60)
+                adjustButton("−10 s", -10)
+                adjustButton("+10 s", 10)
+                adjustButton("+1 min", 60)
             }
         }
         .controlSize(.large)
     }
 
+    /// Moves the number on the display by `seconds` in either mode: a countdown's target shifts,
+    /// a stopwatch's time already counted does.
     private func adjustButton(_ title: String, _ seconds: TimeInterval) -> some View {
-        Button { model.adjust(by: seconds) } label: {
+        Button {
+            switch model.mode {
+            case .countdown: model.adjust(by: seconds)
+            case .stopwatch: model.shiftElapsed(by: seconds)
+            }
+        } label: {
             Text(title).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7).frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
+        // A stopwatch at 0:00 has nothing to take away.
+        .disabled(model.mode == .stopwatch && seconds < 0 && model.isPristine)
     }
 
     private func settings(compact: Bool) -> some View {
@@ -143,6 +154,14 @@ struct ControlView: View {
                 }
             }
 
+            if model.mode == .stopwatch {
+                Section {
+                    Button("Add time already spent…") { shiftingElapsed = true }
+                } footer: {
+                    Text("Started late? Add what has already passed. The stopwatch keeps running while you do.")
+                }
+            }
+
             Section("Message") {
                 // Typing, tapping a preset and pressing Done only edit the text; the toggle alone
                 // decides whether the audience sees it.
@@ -165,11 +184,15 @@ struct ControlView: View {
                 Toggle("Show clock", isOn: $model.showClock)
                 Toggle("Black out", isOn: $model.blackout)
                     .keyboardShortcut("b", modifiers: [])
-                Toggle("Keep running when locked", isOn: $model.keepRunningWhenLocked)
+                if LockKeepalive.isAvailable {
+                    Toggle("Keep running when locked", isOn: $model.keepRunningWhenLocked)
+                }
             } header: {
                 Text("Display")
             } footer: {
-                Text("Keeps the connected display counting after the top button is pressed. Off, the display freezes on the last time until the device is unlocked.")
+                if LockKeepalive.isAvailable {
+                    Text("Keeps the connected display counting after the top button is pressed. Off, the display freezes on the last time until the device is unlocked.")
+                }
             }
         }
         .scrollContentBackground(.hidden)
@@ -230,28 +253,44 @@ private struct DisplayStatus: View {
 }
 
 private struct DurationPicker: View {
+    var title = "Duration"
+    /// The wheels hold a change to add or remove rather than a total to set. A running clock
+    /// moves on while the wheels are being turned, so only a change can be applied to it exactly.
+    var relative = false
     let initial: TimeInterval
+    /// Receives the total, or the signed change when `relative`.
     let onDone: (TimeInterval) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var h = 0
     @State private var m = 0
     @State private var s = 0
+    @State private var removing = false
 
     var body: some View {
         NavigationStack {
-            HStack(spacing: 0) {
-                wheel($h, 0..<24, "h")
-                wheel($m, 0..<60, "min")
-                wheel($s, 0..<60, "s")
+            VStack(spacing: 8) {
+                if relative {
+                    Picker("Direction", selection: $removing) {
+                        Text("Add").tag(false)
+                        Text("Remove").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                }
+                HStack(spacing: 0) {
+                    wheel($h, 0..<24, "h")
+                    wheel($m, 0..<60, "min")
+                    wheel($s, 0..<60, "s")
+                }
             }
             .padding()
-            .navigationTitle("Duration")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Set") {
-                        onDone(TimeInterval(h * 3600 + m * 60 + s))
+                    Button(relative ? (removing ? "Remove" : "Add") : "Set") {
+                        let total = TimeInterval(h * 3600 + m * 60 + s)
+                        onDone(removing ? -total : total)
                         dismiss()
                     }
                     .disabled(h + m + s == 0)

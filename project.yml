@@ -8,8 +8,8 @@ settings:
     DEVELOPMENT_TEAM: 2LV8JK59ZV
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "7"
+    MARKETING_VERSION: "1.1"
+    CURRENT_PROJECT_VERSION: "8"
     # PostHog project API key, shared with Line Bites (events carry app=stage-timer).
     # Empty disables analytics entirely.
     POSTHOG_API_KEY: phc_vUgTnULQdUWDrzsoDfGrBoUz59RY3Z3bSQqvdJukkPt4
@@ -51,10 +51,9 @@ targets:
         UILaunchScreen:
           UIColorName: ""
         UIRequiresFullScreen: false
-        # "Keep running when locked": a silent audio session keeps the app alive after the top
-        # button so the external display keeps counting (Sources/LockKeepalive.swift).
-        UIBackgroundModes:
-          - audio
+        # No UIBackgroundModes while "Keep running when locked" is held back
+        # (LockKeepalive.isAvailable): the option needs `UIBackgroundModes: [audio]` here, and App
+        # Review asks about that mode. The two change together.
         UISupportedInterfaceOrientations~iphone:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
