@@ -58,6 +58,10 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   `Tests/App` is Xcode only and may use anything in the app.
 - **Time in tests stays half a second off every boundary.** `start + 300 - start` is not exactly
   300 in floating point, and a remaining 0.0000001 s rounds up to 0:01.
+- **"Keep running when locked" is in the code but not in the app.** `LockKeepalive.isAvailable`
+  is false and `project.yml` declares no `UIBackgroundModes`: the owner wants an update through
+  App Review before the one that adds background audio (2026-11-25). Turning it on is both edits
+  in one change, its own release, and unverified until run on hardware with a display.
 - **PostHog is pinned to an exact version.** `Package.resolved` lives inside the gitignored
   `.xcodeproj`, so a version range would resolve again on every fresh checkout, CI and a release
   archive included. Raising the pin is a change like any other: its own commit, through CI.

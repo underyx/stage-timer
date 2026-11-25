@@ -51,10 +51,9 @@ targets:
         UILaunchScreen:
           UIColorName: ""
         UIRequiresFullScreen: false
-        # "Keep running when locked": a silent audio session keeps the app alive after the top
-        # button so the external display keeps counting (Sources/LockKeepalive.swift).
-        UIBackgroundModes:
-          - audio
+        # No UIBackgroundModes while "Keep running when locked" is held back
+        # (LockKeepalive.isAvailable): the option needs `UIBackgroundModes: [audio]` here, and App
+        # Review asks about that mode. The two change together.
         UISupportedInterfaceOrientations~iphone:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
