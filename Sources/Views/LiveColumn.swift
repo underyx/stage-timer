@@ -381,6 +381,9 @@ private struct LengthRow: View {
     @Namespace private var strip
 
     private static let presets = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
+    private static let customID = "custom"
+    /// The margin `ControlView` leaves beside this column, which the strip scrolls across.
+    private static let bleed: CGFloat = 16
 
     var body: some View {
         Group {
@@ -393,7 +396,19 @@ private struct LengthRow: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             chips(flexible: false)
                         }
-                        .onAppear { proxy.scrollTo(model.duration, anchor: .center) }
+                        // The strip runs out to the edges of the window, so a key that is
+                        // partly out of view is cut by the glass and not by an invisible line.
+                        .contentMargins(.horizontal, Self.bleed, for: .scrollContent)
+                        .padding(.horizontal, -Self.bleed)
+                        .onAppear {
+                            // The first lengths are in view as it is; one further along is
+                            // brought to the middle.
+                            if isCustom {
+                                proxy.scrollTo(Self.customID, anchor: .trailing)
+                            } else if model.duration > 10 * 60 {
+                                proxy.scrollTo(model.duration, anchor: .center)
+                            }
+                        }
                     }
                 }
                 .animation(Motion.glide, value: model.duration)
@@ -450,6 +465,7 @@ private struct LengthRow: View {
                 }
             }
             .buttonStyle(ChipStyle(selected: isCustom, flexible: flexible, padding: 8, selection: flexible ? spread : strip))
+            .id(Self.customID)
             .accessibilityLabel("Custom length")
         }
     }

@@ -9,6 +9,7 @@ struct MessageCard: View {
     @FocusState private var editing: Bool
 
     private static let presets = ["Wrap up", "5 minutes left", "Questions", "Speak up", "Break"]
+    private static let inset: CGFloat = 14
 
     var body: some View {
         @Bindable var model = model
@@ -48,6 +49,9 @@ struct MessageCard: View {
                     }
                 }
             }
+            // Out to the card's own edges, so the last one in view is cut by the card.
+            .contentMargins(.horizontal, Self.inset, for: .scrollContent)
+            .padding(.horizontal, -Self.inset)
 
             Button { model.showMessage.toggle() } label: {
                 Label {
@@ -62,7 +66,7 @@ struct MessageCard: View {
             .frame(height: 48)
             .disabled(model.message.isEmpty)
         }
-        .padding(14)
+        .padding(Self.inset)
         .background(Theme.surface, in: shape)
         // Going live draws the amber round the card rather than switching it on.
         .overlay {

@@ -190,22 +190,15 @@ private func timer(
 /// The window a picture is taken of: a size in points and the safe area a device has there.
 private struct Device {
     var size: CGSize
-    var safeArea = UIEdgeInsets.zero
+    var safeArea = EdgeInsets()
     var scale: CGFloat = 2
 
-    static let phone = Device(size: CGSize(width: 393, height: 852), safeArea: UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0))
-    static let phoneLandscape = Device(size: CGSize(width: 852, height: 393), safeArea: UIEdgeInsets(top: 0, left: 59, bottom: 21, right: 59))
-    static let smallPhone = Device(size: CGSize(width: 375, height: 667), safeArea: UIEdgeInsets(top: 20, left: 0, bottom: 0, right: 0))
-    static let tabletLandscape = Device(size: CGSize(width: 1180, height: 820), safeArea: UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0), scale: 1)
-    static let tabletPortrait = Device(size: CGSize(width: 820, height: 1180), safeArea: UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0), scale: 1)
+    static let phone = Device(size: CGSize(width: 393, height: 852), safeArea: EdgeInsets(top: 59, leading: 0, bottom: 34, trailing: 0))
+    static let phoneLandscape = Device(size: CGSize(width: 852, height: 393), safeArea: EdgeInsets(top: 0, leading: 59, bottom: 21, trailing: 59))
+    static let smallPhone = Device(size: CGSize(width: 375, height: 667), safeArea: EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
+    static let tabletLandscape = Device(size: CGSize(width: 1180, height: 820), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1)
+    static let tabletPortrait = Device(size: CGSize(width: 820, height: 1180), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1)
     static let screen = Device(size: CGSize(width: 1280, height: 720), scale: 1)
-}
-
-/// A window that reports the safe area it is told to, so a notch and a home bar are left room for
-/// on whatever simulator this runs on.
-private final class Stage: UIWindow {
-    var safeArea = UIEdgeInsets.zero
-    override var safeAreaInsets: UIEdgeInsets { safeArea }
 }
 
 private let folder = URL(fileURLWithPath: #filePath)
@@ -227,11 +220,13 @@ private func activeScene() async throws -> UIWindowScene {
 @MainActor
 private func shoot(_ name: String, _ device: Device, _ view: some View) async throws {
     let scene = try await activeScene()
-    let window = Stage(windowScene: scene)
-    window.safeArea = device.safeArea
+    let window = UIWindow(windowScene: scene)
     window.frame = CGRect(origin: .zero, size: device.size)
     window.backgroundColor = .black
-    let host = UIHostingController(rootView: view)
+    // The simulator's own notch would otherwise push every size down by its status bar, an
+    // iPad's and a projector's included: its safe area is dropped and the device's put in.
+    let host = UIHostingController(rootView: view.safeAreaPadding(device.safeArea).ignoresSafeArea())
+    host.safeAreaRegions = []
     host.view.backgroundColor = .black
     window.rootViewController = host
     window.isHidden = false
