@@ -14,9 +14,11 @@ settings:
     # Empty disables analytics entirely.
     POSTHOG_API_KEY: phc_vUgTnULQdUWDrzsoDfGrBoUz59RY3Z3bSQqvdJukkPt4
 packages:
+  # Pinned: the generated project's Package.resolved is gitignored with it, so a range here would
+  # let every archive pick up whatever 3.x came out that morning. Bump on purpose.
   PostHog:
     url: https://github.com/PostHog/posthog-ios
-    from: "3.0.0"
+    exactVersion: "3.98.2"
 targets:
   StageTimer:
     type: application
@@ -26,6 +28,11 @@ targets:
       - Resources
     dependencies:
       - package: PostHog
+    # A shared scheme, so `xcodebuild -scheme StageTimer test` runs StageTimerTests.
+    scheme:
+      testTargets:
+        - StageTimerTests
+      gatherCoverageData: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.bence.stagetimer
@@ -70,3 +77,17 @@ targets:
             UIWindowSceneSessionRoleExternalDisplayNonInteractive:
               - UISceneConfigurationName: External
                 UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).DisplaySceneDelegate
+  # Hosted in the app (`@testable import StageTimer`) and run on a simulator by `make test`. Every
+  # .swift file under Tests/ is picked up. Tests/App needs the app; Tests/Core is also a SwiftPM
+  # test target (root Package.swift, `make core`), so its files import whichever module exists.
+  StageTimerTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: StageTimer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.bence.stagetimer.tests
+        GENERATE_INFOPLIST_FILE: YES

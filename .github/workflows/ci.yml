@@ -1,0 +1,94 @@
+name: CI
+
+# Compiles and tests every pull request and every push to main. Cloud sessions write most of this
+# app and have no Xcode, so this is where a change is first compiled: read the result before merging.
+#
+# Two jobs. `core` is cheap and runs on Linux. `app` needs a Mac, and this repository is private, so
+# GitHub bills its minutes at about ten times the Linux rate: it is skipped for changes that only
+# touch Markdown, and a newer push to the same pull request cancels the run before it.
+on:
+  pull_request:
+    paths-ignore: ["**.md"]
+  push:
+    branches: [main]
+    paths-ignore: ["**.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # The timer logic that has no UIKit in it, as a SwiftPM package: no simulator, no Mac. There is
+  # nothing to run until a root Package.swift exists, and the job then says so and passes.
+  core:
+    name: Core tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.4
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: swift test
+        run: |
+          if [ ! -f Package.swift ]; then
+            echo "::notice::No Package.swift yet: nothing for SwiftPM to test"
+            exit 0
+          fi
+          swift --version
+          swift test
+
+  app:
+    name: App build and tests (Xcode)
+    # vars.IOS_RUNS_ON is JSON: "xcode-27" (GitHub's image with Xcode 27, the default; macos-26 has
+    # only Xcode 26, which can't compile the app) or the labels of a self-hosted Mac.
+    runs-on: ${{ fromJSON(vars.IOS_RUNS_ON || '"xcode-27"') }}
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        env:
+          XCODE_APP: ${{ vars.XCODE_APP }}
+        run: scripts/select-xcode.sh
+
+      - name: Install XcodeGen
+        env:
+          HOSTED: ${{ runner.environment == 'github-hosted' }}
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+          HOMEBREW_NO_ANALYTICS: "1"
+          HOMEBREW_NO_ENV_HINTS: "1"
+        run: |
+          if ! command -v xcodegen >/dev/null; then
+            if [ "$HOSTED" = true ]; then
+              brew install xcodegen
+            else
+              # Nothing gets installed on the owner's Mac behind his back.
+              echo "::error::xcodegen isn't on the self-hosted runner's PATH (brew install xcodegen)"
+              exit 1
+            fi
+          fi
+          xcodegen --version
+
+      # Debug, on a simulator: the app launches as the test host, then Tests/ runs inside it.
+      - name: Test on a simulator
+        run: make test
+
+      # What an archive compiles: Release, for a device. `#if DEBUG` code and simulator-only
+      # availability can hide an error from the step above.
+      - name: Build Release for a device
+        run: make build
