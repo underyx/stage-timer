@@ -1,16 +1,19 @@
-# Stage Timer
+# Stage Screen
 
-iPad timer whose controls stay on the iPad while an external display shows only the countdown.
+iPhone and iPad timer whose controls stay on the device while an external display shows only the
+countdown. (The repository, Xcode target and bundle id keep the first name, Stage Timer.)
 
 ```sh
-xcodegen generate          # StageTimer.xcodeproj is generated, not committed
-xcodebuild -project StageTimer.xcodeproj -scheme StageTimer -configuration Release \
-  -destination 'generic/platform=iOS' -archivePath build/StageTimer.xcarchive archive -allowProvisioningUpdates
-xcodebuild -exportArchive -archivePath build/StageTimer.xcarchive \
-  -exportOptionsPlist scripts/export-testflight.plist -exportPath build/export -allowProvisioningUpdates
+brew install xcodegen      # once; StageTimer.xcodeproj is generated from project.yml, not committed
+make test                  # build for a simulator and run Tests/ inside the app
+make build                 # Release build for a device, unsigned
+make upload                # archive, upload to App Store Connect, tag the build
+open StageTimer.xcodeproj  # after `make gen`
 ```
 
-Bump `CURRENT_PROJECT_VERSION` in `project.yml` before each TestFlight upload.
+It needs Xcode 27. Every pull request and push to main is built and tested by
+`.github/workflows/ci.yml`. CLAUDE.md has the rest: what is generated, how CI is set up, how a
+release goes, and the traps.
 
 ## External displays
 
