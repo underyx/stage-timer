@@ -184,11 +184,15 @@ struct ControlView: View {
                 Toggle("Show clock", isOn: $model.showClock)
                 Toggle("Black out", isOn: $model.blackout)
                     .keyboardShortcut("b", modifiers: [])
-                Toggle("Keep running when locked", isOn: $model.keepRunningWhenLocked)
+                if LockKeepalive.isAvailable {
+                    Toggle("Keep running when locked", isOn: $model.keepRunningWhenLocked)
+                }
             } header: {
                 Text("Display")
             } footer: {
-                Text("Keeps the connected display counting after the top button is pressed. Off, the display freezes on the last time until the device is unlocked.")
+                if LockKeepalive.isAvailable {
+                    Text("Keeps the connected display counting after the top button is pressed. Off, the display freezes on the last time until the device is unlocked.")
+                }
             }
         }
         .scrollContentBackground(.hidden)

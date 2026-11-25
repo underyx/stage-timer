@@ -26,6 +26,8 @@ release goes, and the traps.
 - **Locking the device:** the top button backgrounds the app, iOS suspends it within seconds, and the
   external display freezes on the last frame. "Keep running when locked" (off by default) keeps the
   app alive with a silent, mixed-in audio session while a display is connected (`LockKeepalive`,
-  `UIBackgroundModes: audio`), so the display keeps counting.
+  `UIBackgroundModes: audio`), so the display keeps counting. **Not in 1.1:** the option is
+  written but switched off (`LockKeepalive.isAvailable`) and the background mode is not declared,
+  so that update goes through App Review without it.
 - **Display windows closed in the background** reach `didDiscardSceneSessions`, not
   `sceneDidDisconnect`; the control scene also prunes `displays` against `openSessions` on activation.

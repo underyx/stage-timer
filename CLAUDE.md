@@ -75,14 +75,19 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   analytics: don't rename them, `title` is the label.
 - **A countdown with overtime off is not running once it reaches 0:00** (`isFinished`), but its
   clock is still counting underneath on purpose: turning overtime on shows how late it really is.
-- **The keepalive runs whenever its setting is on and a display is connected, running timer or
-  not.** Don't narrow it to "while counting": iOS may reclaim a suspended app, and the display
-  showing a paused 5:00 between speakers goes with it.
+- **Once shipped, the keepalive runs whenever its setting is on and a display is connected,
+  running timer or not.** Don't narrow it to "while counting": iOS may reclaim a suspended app,
+  and the display showing a paused 5:00 between speakers goes with it.
 - **`Tests/Core` is compiled twice**: by SwiftPM against the package module, and by Xcode into the
   hosted bundle against the app module. Its files import whichever exists (`#if canImport`).
   `Tests/App` is Xcode only and may use anything in the app.
 - **Time in tests stays half a second off every boundary.** `start + 300 - start` is not exactly
   300 in floating point, and a remaining 0.0000001 s rounds up to 0:01.
+- **"Keep running when locked" is in the code but not in the app.** `LockKeepalive.isAvailable`
+  is false and `project.yml` declares no `UIBackgroundModes`: the owner wants an update through
+  App Review before the one that adds background audio (2026-11-25). Turning it on is both edits
+  in one change, its own release, and unverified until run on hardware with a display. A hosted
+  test (`Tests/App/AppTests.swift`) fails if only one of the two is changed.
 - **PostHog is pinned to an exact version.** `Package.resolved` lives inside the gitignored
   `.xcodeproj`, so a version range would resolve again on every fresh checkout, CI and a release
   archive included. Raising the pin is a change like any other: its own commit, through CI.
