@@ -96,3 +96,14 @@ jobs:
       # availability can hide an error from the step above.
       - name: Build Release for a device
         run: make build
+
+      # Tests/App/ScreenshotTests.swift draws the real views into this folder during `make test`.
+      # Kept even when a step above failed: a picture is often the fastest way to see why.
+      - name: Keep the screenshots
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: screenshots
+          path: build/screenshots
+          if-no-files-found: ignore
+          retention-days: 14

@@ -8,6 +8,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         Analytics.setup()
+        // A timer on stage must never let the device lock under the operator. Set here as well as
+        // on every activation: the control window is not the only scene that can be in front.
+        application.isIdleTimerDisabled = true
         return true
     }
 
@@ -29,8 +32,27 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     /// closed stayed listed as open until the app was relaunched.
     func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {
         for session in sceneSessions {
-            TimerModel.shared.displays[session.persistentIdentifier] = nil
+            TimerModel.shared.displayDisconnected(id: session.persistentIdentifier)
         }
+    }
+}
+
+extension TimerModel {
+    /// The app's timer, wired to the real world: `UserDefaults`, PostHog and the lock keepalive.
+    static let shared = TimerModel(.init(
+        store: UserDefaults.standard,
+        capture: { Analytics.capture($0, $1) },
+        keepalive: { LockKeepalive.set(wanted: $0) }
+    ))
+
+    /// Any scene coming to the front is the cue to catch up on what happened while the app was
+    /// not running.
+    func sceneDidBecomeActive() {
+        UIApplication.shared.isIdleTimerDisabled = true
+        // Belt and braces for a display window closed while the app was suspended: whatever the
+        // system reported or skipped, a session that is gone is not a display.
+        pruneDisplays(keeping: Set(UIApplication.shared.openSessions.map(\.persistentIdentifier)))
+        resync()
     }
 }
 
@@ -67,11 +89,7 @@ final class ControlSceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
-        // A timer on stage must never let the iPad lock under the operator.
-        UIApplication.shared.isIdleTimerDisabled = true
-        // Belt and braces for a display window closed while the app was suspended: whatever the
-        // system reported or skipped, a session that is gone is not a display.
-        TimerModel.shared.pruneDisplays(keeping: Set(UIApplication.shared.openSessions.map(\.persistentIdentifier)))
+        TimerModel.shared.sceneDidBecomeActive()
     }
 }
 
@@ -90,13 +108,15 @@ final class DisplaySceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.makeKeyAndVisible()
         self.window = window
         let kind: DisplayKind = session.role == .windowExternalDisplayNonInteractive ? .external : .window
-        TimerModel.shared.displays[session.persistentIdentifier] = kind
-        Analytics.capture("display_connected", ["display": kind == .external ? "external" : "window"])
+        TimerModel.shared.displayConnected(id: session.persistentIdentifier, kind: kind)
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {
-        TimerModel.shared.displays[scene.session.persistentIdentifier] = nil
-        Analytics.capture("display_disconnected")
+        TimerModel.shared.displayDisconnected(id: scene.session.persistentIdentifier)
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        TimerModel.shared.sceneDidBecomeActive()
     }
 
     static func open() {
