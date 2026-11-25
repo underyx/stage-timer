@@ -184,17 +184,12 @@ struct TimerState: Codable, Equatable, Sendable {
         if stopsAtZero { banked = min(banked, target) }
     }
 
-    /// Make the timer read `seconds` counted as of now, running or not. For a stopwatch that was
-    /// started late.
-    mutating func setElapsed(_ seconds: TimeInterval, at now: Date) {
-        banked = max(seconds, 0)
+    /// Shift the time already counted, for a clock that was started late (or early). Works
+    /// mid-run: the running stretch is banked and restarted from now, so the shift lands exactly
+    /// once and a shift below zero stops at 0:00 instead of leaving the clock in debt.
+    mutating func shiftElapsed(by seconds: TimeInterval, at now: Date) {
+        banked = max(elapsed(at: now) + seconds, 0)
         if startedAt != nil { startedAt = now }
-    }
-
-    /// Shift the time already counted, e.g. to credit the ten minutes that passed before anyone
-    /// pressed Start. A running timer keeps running from the new figure.
-    mutating func adjustElapsed(by seconds: TimeInterval, at now: Date) {
-        setElapsed(elapsed(at: now) + seconds, at: now)
     }
 
     mutating func markUsedReported() {

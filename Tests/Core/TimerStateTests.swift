@@ -278,28 +278,35 @@ private func countdown(_ duration: TimeInterval = 300, overtime: Bool = true, st
         #expect(shot == .init(text: "1:01", phase: .normal, progress: nil, overtime: nil))
     }
 
-    @Test func timeSoFarCanBeSetWhileRunning() {
+    @Test func timeAlreadySpentCanBeAddedWhileRunning() {
         var watch = stopwatch()
-        watch.setElapsed(600, at: at(5))
+        watch.shiftElapsed(by: 600, at: at(5))
         #expect(watch.isActive)
-        #expect(watch.snapshot(at: at(5)).text == "10:00")
-        #expect(watch.snapshot(at: at(15)).text == "10:10")
+        #expect(watch.snapshot(at: at(5)).text == "10:05")
+        #expect(watch.snapshot(at: at(15)).text == "10:15")
     }
 
-    @Test func timeSoFarCanBeSetWhileStopped() {
+    @Test func timeAlreadySpentCanBeAddedBeforeStarting() {
         var watch = stopwatch(started: false)
-        watch.setElapsed(90, at: t0)
+        watch.shiftElapsed(by: 90, at: t0)
         #expect(!watch.isActive && !watch.isPristine)
         #expect(watch.snapshot(at: at(999)).text == "1:30")
+        #expect(watch.start(at: at(999)) == false, "time on the clock means this resumes")
     }
 
-    @Test func adjustingShiftsFromWhatItReadsNowAndStopsAtZero() {
+    @Test func aShiftBelowZeroStopsAtZeroAndTheClockKeepsRunning() {
         var watch = stopwatch()
-        watch.adjustElapsed(by: 60, at: at(30))
-        #expect(watch.snapshot(at: at(30)).text == "1:30")
-        watch.adjustElapsed(by: -600, at: at(40))
+        watch.shiftElapsed(by: -600, at: at(40))
         #expect(watch.snapshot(at: at(40)).text == "0:00")
         #expect(watch.snapshot(at: at(45)).text == "0:05")
+    }
+
+    /// The shift applies to what the clock reads when it lands, not to when the sheet was opened.
+    @Test func shiftsAddUpExactlyOnce() {
+        var watch = stopwatch()
+        watch.shiftElapsed(by: 60, at: at(30))
+        watch.shiftElapsed(by: -10, at: at(31))
+        #expect(watch.elapsed(at: at(31)) == 81)
     }
 }
 

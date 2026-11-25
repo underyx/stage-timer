@@ -160,10 +160,10 @@ private final class Rig {
         rig.model.mode = .stopwatch
         rig.model.start()
         rig.advance(5)
-        rig.model.setElapsed(600)
+        rig.model.shiftElapsed(by: 600)
         rig.advance(10)
-        #expect(rig.text() == "10:10")
-        rig.model.adjustElapsed(by: -10)
+        #expect(rig.text() == "10:15")
+        rig.model.shiftElapsed(by: -15)
         #expect(rig.text() == "10:00")
         #expect(rig.model.isRunning)
     }

@@ -191,16 +191,11 @@ final class TimerModel {
         update(at: now) { $0.timer.adjust(by: seconds, at: now) }
     }
 
-    /// Stopwatch: shift the time already counted. A running stopwatch keeps running.
-    func adjustElapsed(by seconds: TimeInterval) {
+    /// Shift the time already counted, for a stopwatch that was started late. A running one
+    /// keeps running, and a shift below zero stops at 0:00.
+    func shiftElapsed(by seconds: TimeInterval) {
         let now = deps.now()
-        update(at: now) { $0.timer.adjustElapsed(by: seconds, at: now) }
-    }
-
-    /// Stopwatch: make it read `seconds` now, running or not.
-    func setElapsed(_ seconds: TimeInterval) {
-        let now = deps.now()
-        update(at: now) { $0.timer.setElapsed(seconds, at: now) }
+        update(at: now) { $0.timer.shiftElapsed(by: seconds, at: now) }
     }
 
     // MARK: Displays
