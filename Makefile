@@ -78,5 +78,9 @@ upload: check-release archive
 version:
 	@echo "Stage Screen $(VERSION) ($(BUILD))"
 
+# For scripts and the TestFlight workflow: `make -s print-VERSION`, print-BUILD, print-TAG.
+print-%:
+	@echo $($*)
+
 clean:
 	rm -rf $(BUILD_DIR) $(PROJECT) Sources/Info.plist

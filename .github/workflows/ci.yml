@@ -84,6 +84,10 @@ jobs:
           fi
           xcodegen --version
 
+      # The TestFlight workflow's profile script, against a fake App Store Connect: a second.
+      - name: Test the release scripts
+        run: python3 scripts/ci/test_asc_profiles.py
+
       # Debug, on a simulator: the app launches as the test host, then Tests/ runs inside it.
       - name: Test on a simulator
         run: make test
