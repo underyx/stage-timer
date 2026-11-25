@@ -19,6 +19,13 @@ struct Transport: View {
     private static let holdTime = 0.7
     private static let radius: CGFloat = 18
 
+    /// `holding` draws the row as it is partway through a hold on Reset. Only a screenshot asks
+    /// for it: nothing but a finger can hold the key.
+    init(holding: Bool = false) {
+        _holding = State(initialValue: holding)
+        _fill = State(initialValue: holding ? 0.6 : 0)
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             Button { model.toggle() } label: {

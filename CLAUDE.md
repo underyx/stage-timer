@@ -48,6 +48,11 @@ The repository is private, so the `app` job's minutes bill at about ten times th
 That is why a change that touches only `**.md` starts no run, and why a newer push cancels the
 run before it. Don't add a second macOS job or a matrix without a reason worth that.
 
+**CI is also where the app is first seen.** `Tests/App/ScreenshotTests.swift` draws the real views
+in the states a talk goes through into `build/screenshots/` during `make test`, and the `app` job
+uploads the folder as the `screenshots` artifact. Nothing is compared; look at them after a change
+to a view, and add a shot for a new state. They are stills: motion and haptics are still unseen.
+
 CI cannot see a real external display, AirPlay, Stage Manager or the lock button. A change to the
 scene code or `LockKeepalive` is unverified until someone runs it on hardware, whatever CI says.
 
