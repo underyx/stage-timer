@@ -3,6 +3,7 @@ import SwiftUI
 struct ControlView: View {
     @Environment(TimerModel.self) private var model
     @State private var editingDuration = false
+    @State private var editingElapsed = false
 
     var body: some View {
         GeometryReader { geo in
@@ -34,7 +35,13 @@ struct ControlView: View {
         }
         .background(Color(.systemGroupedBackground))
         .sheet(isPresented: $editingDuration) {
-            DurationPicker(initial: model.duration) { model.setDuration($0) }
+            DurationPicker(title: "Duration", initial: model.duration) { model.setDuration($0) }
+        }
+        .sheet(isPresented: $editingElapsed) {
+            // Opens on the time showing now; Set applies the picked time at the moment it is tapped.
+            DurationPicker(title: "Time so far", initial: model.elapsed(at: .now), allowsZero: true) {
+                model.setElapsed($0)
+            }
         }
     }
 
@@ -84,20 +91,22 @@ struct ControlView: View {
             }
             .font(.title3.weight(.semibold))
 
-            if model.mode == .countdown {
-                HStack(spacing: 8) {
-                    adjustButton("−1 min", -60)
-                    adjustButton("−10 s", -10)
-                    adjustButton("+10 s", 10)
-                    adjustButton("+1 min", 60)
-                }
+            // Countdown: move the target. Stopwatch: change the time already counted, for when
+            // Start was pressed late. Both work while running.
+            HStack(spacing: 8) {
+                adjustButton("−1 min", -60)
+                adjustButton("−10 s", -10)
+                adjustButton("+10 s", 10)
+                adjustButton("+1 min", 60)
             }
         }
         .controlSize(.large)
     }
 
     private func adjustButton(_ title: String, _ seconds: TimeInterval) -> some View {
-        Button { model.adjust(by: seconds) } label: {
+        Button {
+            if model.mode == .countdown { model.adjust(by: seconds) } else { model.adjustElapsed(by: seconds) }
+        } label: {
             Text(title).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7).frame(maxWidth: .infinity)
         }
         .buttonStyle(.bordered)
@@ -140,6 +149,12 @@ struct ControlView: View {
                         Text("5 min").tag(TimeInterval(300))
                     }
                     Toggle("Count up past zero", isOn: $model.countOvertime)
+                }
+            } else {
+                Section {
+                    Button("Set time so far…") { editingElapsed = true }
+                } footer: {
+                    Text("Started late? Set the time that has already passed, or use the +1 min and +10 s buttons. A running stopwatch keeps running.")
                 }
             }
 
@@ -230,7 +245,9 @@ private struct DisplayStatus: View {
 }
 
 private struct DurationPicker: View {
+    let title: String
     let initial: TimeInterval
+    var allowsZero = false
     let onDone: (TimeInterval) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var h = 0
@@ -245,7 +262,7 @@ private struct DurationPicker: View {
                 wheel($s, 0..<60, "s")
             }
             .padding()
-            .navigationTitle("Duration")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -254,7 +271,7 @@ private struct DurationPicker: View {
                         onDone(TimeInterval(h * 3600 + m * 60 + s))
                         dismiss()
                     }
-                    .disabled(h + m + s == 0)
+                    .disabled(!allowsZero && h + m + s == 0)
                 }
             }
         }

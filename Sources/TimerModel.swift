@@ -145,6 +145,18 @@ final class TimerModel {
         scheduleUsedCheck()
     }
 
+    /// Stopwatch only: shift the time already counted, e.g. to credit the ten minutes that passed
+    /// before anyone pressed Start. A running stopwatch keeps running from the new figure.
+    func adjustElapsed(by seconds: TimeInterval) {
+        setElapsed(elapsed(at: .now) + seconds)
+    }
+
+    /// Stopwatch only: make the stopwatch read `seconds` now, running or not.
+    func setElapsed(_ seconds: TimeInterval) {
+        banked = max(seconds, 0)
+        if isRunning { startedAt = .now }
+    }
+
     struct Snapshot {
         var text: String
         var phase: Phase
