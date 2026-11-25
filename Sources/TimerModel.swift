@@ -32,7 +32,7 @@ final class TimerModel {
 
     /// Keep counting on a connected display after the top button locks the device. Persisted:
     /// it is a decision about the room's hardware, not about one show.
-    var keepRunningWhenLocked = UserDefaults.standard.bool(forKey: Self.keepRunningKey) {
+    var keepRunningWhenLocked = UserDefaults.standard.bool(forKey: TimerModel.keepRunningKey) {
         didSet {
             UserDefaults.standard.set(keepRunningWhenLocked, forKey: Self.keepRunningKey)
             updateKeepalive()
