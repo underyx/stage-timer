@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The TestFlight export from GitHub (.github/workflows/ios-testflight.yml). Manual signing, because
+  the App Store Connect API key can't use cloud-managed signing ("Cloud signing permission error").
+  provisioningProfiles is the one list of profile names: asc_profiles.py makes sure each exists
+  and is installed, and the workflow's archive step signs the app with the same one.
+  A dry run replaces destination with "export".
+
+  scripts/export-testflight.plist is the other export: automatic signing, for `make upload` on
+  the Mac, where Xcode's own account manages the profile.
+-->
+<plist version="1.0">
+<dict>
+	<key>method</key><string>app-store-connect</string>
+	<key>destination</key><string>upload</string>
+	<key>teamID</key><string>2LV8JK59ZV</string>
+	<key>signingStyle</key><string>manual</string>
+	<key>signingCertificate</key><string>Apple Distribution</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>dev.bence.stagetimer</key><string>Stage Screen App Store</string>
+	</dict>
+	<key>uploadSymbols</key><true/>
+	<key>manageAppVersionAndBuildNumber</key><false/>
+</dict>
+</plist>

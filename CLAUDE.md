@@ -70,15 +70,38 @@ Merging to main and uploading a build to TestFlight are pre-approved by the owne
 "feel free to merge and release to test flight"). Submitting a build to App Review still needs
 his explicit word.
 
-1. Raise `CURRENT_PROJECT_VERSION` in `project.yml` (and `MARKETING_VERSION` for a new version),
-   through a pull request like any other change.
-2. On the Mac, on the merged commit: `make upload`. It refuses uncommitted changes and a build
-   number whose tag already exists, archives, uploads to App Store Connect, and tags the commit
-   `v<version>-<build>`. `AUTH="-authenticationKeyPath … -authenticationKeyID …
-   -authenticationKeyIssuerID …"` signs in with an App Store Connect API key instead of Xcode's
-   account.
-3. `git push origin v<version>-<build>`. The tag is the only record of which commit a build was;
-   builds up to 1.0 (7) have none.
+The version and build live in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`).
+Raise the build for every upload, through a pull request like any other change: App Store Connect
+refuses a build number it has seen. Then, from the merged commit on main, either:
+
+- **From GitHub, no Mac:** run the `iOS TestFlight` workflow on main with `dry_run` off
+  (`gh workflow run ios-testflight.yml -f dry_run=false`, or the GitHub tools' run-workflow call).
+  It archives, signs, uploads and pushes the tag.
+- **On the Mac:** `make upload`, then `git push origin v<version>-<build>`. `AUTH="…"` passes
+  xcodebuild an App Store Connect API key instead of Xcode's account (see the Makefile).
+
+Both refuse a build whose tag `v<version>-<build>` exists and both leave that tag on the commit
+they uploaded. The tag is the only record of which commit a build was; builds up to 1.0 (7) have
+none. If you upload any other way, push the tag by hand.
+
+`.github/workflows/ios-testflight.yml`, with `dry_run` on (the default) or on a pull request that
+changes it or `scripts/ci/`, does everything but the upload and the tag: do a dry run after
+changing signing, the export options or the workflow.
+
+- **The two paths sign differently.** The Mac signs automatically with Xcode's account
+  (`scripts/export-testflight.plist`). GitHub signs manually with the profile named in
+  `scripts/ci/ExportOptions.plist`, because the API key can't use cloud-managed signing;
+  `scripts/ci/asc_profiles.py` creates or repairs that profile for the certificate the job holds.
+- **The workflow's secrets come from the life repository's setup script**, run once by the owner
+  at the Mac: `ios/scripts/setup-release.sh --hosted --repo underyx/stage-timer` in a checkout of
+  underyx/life. It sets `ASC_API_KEY_P8`, `DIST_P12_BASE64`, `DIST_P12_PASSWORD` and the
+  variables `ASC_KEY_ID`, `ASC_ISSUER_ID`, `IOS_RUNS_ON`. Run it again after the distribution
+  certificate is renewed.
+- **Signing settings on the xcodebuild line reach the PostHog package's targets too.** The
+  workflow names the profile through `STAGE_PROFILE_<bundle id>` for that reason; a plain
+  `PROVISIONING_PROFILE_SPECIFIER=` fails the package with "does not support provisioning
+  profiles".
+- **`scripts/ci/asc_profiles.py` is a copy** of the life repository's. Fix a bug in both.
 
 ## Writing things down
 
