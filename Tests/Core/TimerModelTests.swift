@@ -280,6 +280,23 @@ private final class Rig {
         #expect(!nextDay.showMessage && !nextDay.blackout)
     }
 
+    /// The same round trip through the store the app really uses.
+    @Test func userDefaultsCarriesTheStateBetweenLaunches() throws {
+        let suite = "stage-timer-tests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let first = TimerModel(.init(store: defaults, now: { t0 }))
+        first.setDuration(90)
+        first.message = "Wrap up"
+        first.keepRunningWhenLocked = true
+        first.start()
+
+        let second = TimerModel(.init(store: defaults, now: { t0.addingTimeInterval(30) }))
+        #expect(second.isRunning && second.message == "Wrap up" && second.keepRunningWhenLocked)
+        #expect(second.snapshot(at: t0.addingTimeInterval(30)).text == "1:00")
+    }
+
     @Test func unreadableSavedStateStartsFromDefaults() {
         let rig = Rig()
         rig.store.values[TimerModel.stateKey] = Data("not json".utf8)

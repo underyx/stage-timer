@@ -12,7 +12,7 @@ enum Analytics {
         // Unit tests run hosted inside the app; a test run is not a person using it.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         guard let key = Bundle.main.object(forInfoDictionaryKey: "PostHogAPIKey") as? String, !key.isEmpty else { return }
-        let config = PostHogConfig(apiKey: key)
+        let config = PostHogConfig(projectToken: key)
         config.captureApplicationLifecycleEvents = true
         config.captureScreenViews = true
         config.captureElementInteractions = true
