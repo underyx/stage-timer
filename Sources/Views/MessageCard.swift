@@ -49,9 +49,7 @@ struct MessageCard: View {
                     }
                 }
             }
-            // Out to the card's own edges, so the last one in view is cut by the card.
-            .contentMargins(.horizontal, Self.inset, for: .scrollContent)
-            .padding(.horizontal, -Self.inset)
+            .bleedingStrip(Self.inset)
 
             Button { model.showMessage.toggle() } label: {
                 Label {

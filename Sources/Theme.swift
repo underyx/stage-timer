@@ -133,4 +133,21 @@ extension View {
             .kerning(0.6)
             .foregroundStyle(Theme.secondary)
     }
+
+    /// For a strip that scrolls sideways inside a margin: it runs `margin` further out on both
+    /// sides and fades there, so a key that is partly out of view dissolves towards the edge
+    /// instead of being cut by a line nobody can see. At rest nothing is faded.
+    func bleedingStrip(_ margin: CGFloat) -> some View {
+        contentMargins(.horizontal, margin, for: .scrollContent)
+            .mask {
+                HStack(spacing: 0) {
+                    LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: margin)
+                    Color.black
+                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: margin)
+                }
+            }
+            .padding(.horizontal, -margin)
+    }
 }

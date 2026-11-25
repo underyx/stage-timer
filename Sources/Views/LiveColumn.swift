@@ -382,7 +382,7 @@ private struct LengthRow: View {
 
     private static let presets = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
     private static let customID = "custom"
-    /// The margin `ControlView` leaves beside this column, which the strip scrolls across.
+    /// The margin `ControlView` leaves beside this column on a phone, which the strip fades across.
     private static let bleed: CGFloat = 16
 
     var body: some View {
@@ -396,10 +396,7 @@ private struct LengthRow: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             chips(flexible: false)
                         }
-                        // The strip runs out to the edges of the window, so a key that is
-                        // partly out of view is cut by the glass and not by an invisible line.
-                        .contentMargins(.horizontal, Self.bleed, for: .scrollContent)
-                        .padding(.horizontal, -Self.bleed)
+                        .bleedingStrip(Self.bleed)
                         .onAppear {
                             // The first lengths are in view as it is; one further along is
                             // brought to the middle.

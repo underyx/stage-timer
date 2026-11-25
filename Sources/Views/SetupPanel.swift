@@ -149,8 +149,10 @@ private struct SetupRow<Trailing: View>: View {
         HStack(spacing: 8) {
             Text(title).foregroundStyle(Theme.text)
             Spacer(minLength: 12)
+            // The value keeps its line; in a narrow column it is the label that wraps.
             HStack(spacing: 6) { trailing }
                 .foregroundStyle(Theme.secondary)
+                .fixedSize()
         }
         .setupRow()
     }

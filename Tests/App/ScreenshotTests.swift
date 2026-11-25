@@ -220,16 +220,26 @@ private func activeScene() async throws -> UIWindowScene {
 @MainActor
 private func shoot(_ name: String, _ device: Device, _ view: some View) async throws {
     let scene = try await activeScene()
+    // The simulator's own status bar and home bar would otherwise push every size about, an
+    // iPad's and a projector's included, and blur the top of whatever scrolls. So the view is
+    // drawn well inside a larger window, where no part of it is under them, and is given the
+    // device's safe area instead.
+    let margin: CGFloat = 120
+    let frame = CGRect(origin: CGPoint(x: margin, y: margin), size: device.size)
     let window = UIWindow(windowScene: scene)
-    window.frame = CGRect(origin: .zero, size: device.size)
+    window.frame = CGRect(origin: .zero, size: CGSize(width: device.size.width + 2 * margin, height: device.size.height + 2 * margin))
     window.backgroundColor = .black
-    // The simulator's own notch would otherwise push every size down by its status bar, an
-    // iPad's and a projector's included: its safe area is dropped and the device's put in.
-    let host = UIHostingController(rootView: view.safeAreaPadding(device.safeArea).ignoresSafeArea())
-    host.safeAreaRegions = []
+    window.overrideUserInterfaceStyle = .dark
+    let root = UIViewController()
+    let host = UIHostingController(rootView: view.safeAreaPadding(device.safeArea))
     host.view.backgroundColor = .black
-    window.rootViewController = host
+    host.view.autoresizingMask = []
+    root.addChild(host)
+    root.view.addSubview(host.view)
+    host.didMove(toParent: root)
+    window.rootViewController = root
     window.isHidden = false
+    host.view.frame = frame
     window.layoutIfNeeded()
     // Long enough for what animates in on appearing (the connection ring, the message card).
     try await Task.sleep(for: .milliseconds(900))
@@ -238,8 +248,9 @@ private func shoot(_ name: String, _ device: Device, _ view: some View) async th
     format.scale = device.scale
     format.opaque = true
     let bounds = CGRect(origin: .zero, size: device.size)
+    host.view.frame = frame
     let image = UIGraphicsImageRenderer(bounds: bounds, format: format).image { _ in
-        window.drawHierarchy(in: bounds, afterScreenUpdates: true)
+        host.view.drawHierarchy(in: bounds, afterScreenUpdates: true)
     }
     window.isHidden = true
     window.rootViewController = nil
