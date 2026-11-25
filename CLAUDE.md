@@ -147,6 +147,12 @@ changing signing, the export options or the workflow.
   `PROVISIONING_PROFILE_SPECIFIER=` fails the package with "does not support provisioning
   profiles".
 - **`scripts/ci/asc_profiles.py` is a copy** of the life repository's. Fix a bug in both.
+- **`403 FORBIDDEN.REQUIRED_AGREEMENTS_MISSING_OR_EXPIRED` at the profile step is Apple's, not
+  the key's or the script's.** The owner has an agreement to accept at developer.apple.com/account;
+  nobody else can. It took effect about eight minutes after he accepted (2026-11-25): re-run the
+  failed job, don't rotate the key or repeat the setup.
+- **The upload and the tag push have not run on GitHub yet** (as of 2026-11-25; dry runs pass).
+  Delete this entry after the first real release from the workflow.
 
 ## Writing things down
 
