@@ -48,8 +48,9 @@ targets:
         LSApplicationCategoryType: public.app-category.productivity
         ITSAppUsesNonExemptEncryption: false
         PostHogAPIKey: $(POSTHOG_API_KEY)
+        # The control surface is always dark; a white launch screen is a flash in a dimmed room.
         UILaunchScreen:
-          UIColorName: ""
+          UIColorName: LaunchBackground
         UIRequiresFullScreen: false
         # No UIBackgroundModes while "Keep running when locked" is held back
         # (LockKeepalive.isAvailable): the option needs `UIBackgroundModes: [audio]` here, and App
