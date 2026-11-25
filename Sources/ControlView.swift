@@ -117,7 +117,7 @@ struct ControlView: View {
         return Form {
             Section {
                 Picker("Mode", selection: $model.mode) {
-                    ForEach(TimerModel.Mode.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(TimerModel.Mode.allCases) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
             }
