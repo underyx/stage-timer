@@ -51,7 +51,16 @@ run before it. Don't add a second macOS job or a matrix without a reason worth t
 **CI is also where the app is first seen.** `Tests/App/ScreenshotTests.swift` draws the real views
 in the states a talk goes through into `build/screenshots/` during `make test`, and the `app` job
 uploads the folder as the `screenshots` artifact. Nothing is compared; look at them after a change
-to a view, and add a shot for a new state. They are stills: motion and haptics are still unseen.
+to a view, and add a shot for a new state.
+
+**A change that animates is filmed, and the film is read before it ships.** The same tests make one
+change on a mounted view and keep the frames while it settles, in `build/screenshots/motion/<name>/`
+(file names are milliseconds since the change, at a quarter of the app's speed: `Motion.slowdown`).
+Build 1.2 (9) went to TestFlight on stills alone, and the owner found three animation glitches in
+ten minutes, each between two stills that looked right. Add a film for anything new that moves. An
+animation that does not come from `Motion` (use `Motion.paced` for a one-off) is not slowed and is
+over in two frames. Still unseen: what a finger adds (a key going down, the hold on Reset), what
+the system animates at its own pace, and haptics.
 
 CI cannot see a real external display, AirPlay, Stage Manager or the lock button. A change to the
 scene code or `LockKeepalive` is unverified until someone runs it on hardware, whatever CI says.
@@ -84,6 +93,12 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
 - **The display's digits are scaled, not re-set, to make room for a message** (`DisplayView`):
   a font size does not animate. Their size is worked out for the widest time the run will show,
   so it does not jump at 9:59; `ems` there is an estimate of SF Rounded's widths.
+- **The display's digits never animate their own place or size; only their colour fades.** They are
+  a mask over the colour, with the animation taken off them, because any animation that reached
+  the text when it changed (the colour fade did) made the new time slide in at an angle.
+- **A control must not change size when its state does.** The Black out key lays out both of its
+  titles and shows one: when it grew to say "Blacked out", its amber fill arrived outside the
+  margin and the line beside it was pushed about.
 - **Saved state decodes all or nothing** (`SavedState`, one JSON value in UserDefaults under
   `state`). A new field in `SavedState` or `TimerState` must be optional, or the update that adds
   it silently resets every user's settings. `TimerState.Mode` raw values are stored and sent to

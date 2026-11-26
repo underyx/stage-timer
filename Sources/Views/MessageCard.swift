@@ -73,7 +73,7 @@ struct MessageCard: View {
                 .stroke(Theme.amber, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                 .opacity(live ? 1 : 0)
         }
-        .animation(reduceMotion ? Motion.fade : .easeInOut(duration: 0.5), value: live)
+        .animation(reduceMotion ? Motion.fade : Motion.paced(.easeInOut(duration: 0.5)), value: live)
         .sensoryFeedback(trigger: live) { _, live in
             .impact(weight: live ? .medium : .light)
         }

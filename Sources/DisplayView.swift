@@ -36,7 +36,7 @@ private struct Face: View {
                     .opacity(model.blackout ? 0 : 1)
             }
             // Blacking out dims like house lights rather than cutting.
-            .animation(.easeInOut(duration: 0.35), value: model.blackout)
+            .animation(Motion.paced(.easeInOut(duration: 0.35)), value: model.blackout)
         }
     }
 
@@ -51,19 +51,32 @@ private struct Face: View {
             // set again smaller: scaling animates, a font size does not.
             Color.clear
                 .overlay {
-                    Text(snapshot.text)
-                        .font(.system(size: full, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(color)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.3)
-                        .contentTransition(.identity)
+                    // The colour and the digits are two layers, the digits cut out of the colour,
+                    // because they change differently. White to amber to red is a change of
+                    // state and fades. A new time is a cut: 1:00 becoming 10:00 is narrower type
+                    // in another place, and a number that travels there (it did, at an angle,
+                    // whenever the colour changed in the same moment) is a number nobody can read.
+                    color
+                        .animation(Motion.paced(.easeInOut(duration: 0.6)), value: snapshot.phase)
+                        .mask {
+                            Text(snapshot.text)
+                                .font(.system(size: full, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.3)
+                                .contentTransition(.identity)
+                                .transaction { $0.animation = nil }
+                        }
                         // Tall enough for the line at full size, so only a time too wide for the
                         // estimate in `ems` is ever shrunk by the text itself.
                         .frame(width: max(width - unit * 0.10, 1), height: unit * 0.8)
+                        // The block still glides up as one when a message takes the bottom of the
+                        // screen; without this the digits inside it would jump there instead.
+                        .geometryGroup()
                         .scaleEffect(sharing ? shared / full : 1)
-                        // White to amber to red is a change of state, not a cut.
-                        .animation(.easeInOut(duration: 0.6), value: snapshot.phase)
+                        .accessibilityElement()
+                        .accessibilityLabel(snapshot.text)
+                        .accessibilityAddTraits(.updatesFrequently)
                 }
 
             if sharing {
@@ -86,7 +99,7 @@ private struct Face: View {
                 ProgressBar(progress: progress, color: color, height: max(unit * 0.018, 3))
             }
         }
-        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.12), value: sharing)
+        .animation(Motion.paced(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.12)), value: sharing)
         .overlay(alignment: .topTrailing) {
             if model.showClock {
                 Text(now, format: .dateTime.hour().minute())

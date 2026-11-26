@@ -32,8 +32,9 @@ struct SetupPanel: View {
                 Text("The timer has already started. Switching mode resets it.")
             }
 
-            switch model.mode {
-            case .countdown:
+            // A stopwatch has nothing to decide beforehand. Shifting its time is done mid-talk and
+            // has its key in the live column, where the lengths are for a countdown.
+            if model.mode == .countdown {
                 SetupCard("Countdown", fill: cardFill) {
                     Button { open(.length) } label: {
                         SetupRow("Custom length") {
@@ -57,20 +58,6 @@ struct SetupPanel: View {
                     }
                     RowDivider()
                     Toggle("Keep counting past zero", isOn: $model.countOvertime).setupRow()
-                }
-            case .stopwatch:
-                SetupCard(
-                    "Stopwatch",
-                    footer: "Started late? Add what has already passed. The stopwatch keeps running while you do.",
-                    fill: cardFill
-                ) {
-                    Button { open(.elapsed) } label: {
-                        SetupRow("Add time already spent") {
-                            Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
                 }
             }
 

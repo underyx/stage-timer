@@ -204,11 +204,11 @@ struct ScreenshotTests {
     /// its film: a view takes most of a second to be put up before filming starts.
     @Test func runningOut() async throws {
         let amber = timer(elapsed: 4 * 60 - 1.5)
-        try await film("into-the-last-minute", .phone, ControlView().environment(amber), for: .seconds(2)) {}
+        try await film("into-the-last-minute", .phone, ControlView().environment(amber), for: .seconds(4)) {}
         let red = timer(elapsed: 5 * 60 - 1.5)
-        try await film("into-overtime", .phone, ControlView().environment(red), for: .seconds(2)) {}
+        try await film("into-overtime", .phone, ControlView().environment(red), for: .seconds(4)) {}
         let room = timer(elapsed: 5 * 60 - 1.5)
-        try await film("screen-into-overtime", .screen, DisplayView().environment(room), for: .seconds(2)) {}
+        try await film("screen-into-overtime", .screen, DisplayView().environment(room), for: .seconds(4)) {}
         // 10:00 is one digit wider than the 9:59 that follows it a second after the start.
         let tens = timer(length: 10 * 60)
         try await film("screen-ten-minutes-to-nine", .screen, DisplayView().environment(tens), for: .seconds(2)) { tens.start() }
@@ -355,21 +355,30 @@ private func shoot(_ name: String, _ device: Device, _ view: some View) async th
     try png.write(to: folder.appendingPathComponent(name + ".png"))
 }
 
+/// How much slower than life a film is taken. A frame takes the simulator in CI about an eighth
+/// of a second to draw, so at full speed a third-of-a-second glide is two frames; slowed, the
+/// same curve is a dozen.
+private let slowdown = 4.0
+
 /// Films a change: the view is put up, `change` is made, and a frame is kept as often as one
 /// can be drawn until `length` has passed. The frames go to `motion/<name>/`, each named for the
-/// milliseconds since the change, after one of how it stood before.
+/// milliseconds since the change (divide by `slowdown` for the app's own time), after one of
+/// how it stood before.
 ///
 /// The change is made on the model, as a key's action makes it. What a finger adds (a key going
-/// down under it, a hold) is not in these.
+/// down under it, a hold) is not in these, and neither is anything the system animates at its
+/// own pace (a symbol redrawing, a sheet). The countdown itself keeps real time.
 @MainActor
 private func film(
     _ name: String,
     _ device: Device,
     _ view: some View,
-    for length: Duration = .milliseconds(1100),
+    for length: Duration = .milliseconds(3200),
     _ change: @MainActor () -> Void
 ) async throws {
     let (window, canvas) = try await mount(device, view)
+    Motion.slowdown = slowdown
+    defer { Motion.slowdown = 1 }
     var frames = [(name: String, image: UIImage)]()
     frames.append(("0000-before", picture(of: canvas, device)))
     let clock = ContinuousClock()
