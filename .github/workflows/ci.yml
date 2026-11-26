@@ -3,9 +3,14 @@ name: CI
 # Compiles and tests every pull request and every push to main. Cloud sessions write most of this
 # app and have no Xcode, so this is where a change is first compiled: read the result before merging.
 #
-# Two jobs. `core` is cheap and runs on Linux. `app` needs a Mac, and this repository is private, so
-# GitHub bills its minutes at about ten times the Linux rate: it is skipped for changes that only
-# touch Markdown, and a newer push to the same pull request cancels the run before it.
+# Two jobs. `core` is cheap and runs on Linux. `app` needs a Mac. The repository is public, so
+# neither bills any minutes; a change that only touches Markdown still starts no run, and a newer
+# push to the same pull request still cancels the run before it, because a Mac takes a while to get.
+#
+# Public also means anyone can open a pull request from a fork. Such a run gets no secrets and a
+# read-only token, and waits for the owner's approval (repository setting). Keep it that way: no
+# `pull_request_target`, and no self-hosted runner on this repository, which a fork's pull request
+# could aim its own copy of this file at.
 on:
   pull_request:
     paths-ignore: ["**.md"]
@@ -51,7 +56,8 @@ jobs:
   app:
     name: App build and tests (Xcode)
     # vars.IOS_RUNS_ON is JSON: "xcode-27" (GitHub's image with Xcode 27, the default; macos-26 has
-    # only Xcode 26, which can't compile the app) or the labels of a self-hosted Mac.
+    # only Xcode 26, which can't compile the app). Not the labels of a self-hosted Mac while the
+    # repository is public: see the top of this file.
     runs-on: ${{ fromJSON(vars.IOS_RUNS_ON || '"xcode-27"') }}
     timeout-minutes: 30
     steps:
