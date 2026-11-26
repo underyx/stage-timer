@@ -37,7 +37,7 @@ struct LiveColumn: View {
                     Image(systemName: "slider.horizontal.3")
                         .font(.body.weight(.semibold))
                 }
-                .buttonStyle(KeyStyle(radius: 22))
+                .buttonStyle(KeyStyle())
                 .frame(width: 44, height: 44)
                 .accessibilityLabel("Setup")
             }
@@ -56,7 +56,7 @@ private struct Monitor: View {
     @State private var starts = 0
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
         DisplayView()
             .aspectRatio(16 / 9, contentMode: .fit)
             .clipShape(shape)
@@ -70,8 +70,8 @@ private struct Monitor: View {
                         Motion.paced(glow == 1 ? .easeOut(duration: 0.1) : .easeOut(duration: 0.8))
                     }
             }
-            .overlay(alignment: .topLeading) { badge.padding(10) }
-            .overlay(alignment: .bottomLeading) { nudgeEcho.padding(10).padding(.bottom, 4) }
+            .overlay(alignment: .topLeading) { badge.padding(12) }
+            .overlay(alignment: .bottomLeading) { nudgeEcho.padding(12).padding(.bottom, 4) }
             .onChange(of: model.isRunning) { _, running in
                 if running && !reduceMotion { starts += 1 }
             }
@@ -367,7 +367,7 @@ private struct BlackoutButton: View {
             }
             .fontWeight(.semibold)
         }
-        .buttonStyle(ChipStyle(selected: model.blackout, radius: 22))
+        .buttonStyle(ChipStyle(selected: model.blackout))
         .animation(Motion.fade, value: model.blackout)
         .keyboardShortcut("b", modifiers: [])
         .sensoryFeedback(.selection, trigger: model.blackout)
@@ -385,49 +385,53 @@ private struct LengthRow: View {
     @State private var pending: TimeInterval?
     /// Counts the lengths chosen here, for the click that answers a pick.
     @State private var picks = 0
-    // One per arrangement: only one is ever on screen, but both are measured.
-    @Namespace private var spread
-    @Namespace private var strip
 
     private static let presets = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
-    private static let customID = "custom"
-    /// The margin `ControlView` leaves beside this column on a phone, which the strip fades across.
-    private static let bleed: CGFloat = 16
 
     var body: some View {
         Group {
             switch model.mode {
             case .countdown:
-                // Side by side where they fit (an iPad), a strip to swipe where they do not.
-                ViewThatFits(in: .horizontal) {
-                    chips(flexible: true)
-                    ScrollViewReader { proxy in
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            chips(flexible: false)
-                        }
-                        .bleedingStrip(Self.bleed)
-                        .onAppear {
-                            // The first lengths are in view as it is; one further along is
-                            // brought to the middle.
-                            if !isCustom && model.duration > 10 * 60 {
-                                proxy.scrollTo(model.duration, anchor: .center)
+                HStack(spacing: 8) {
+                    // Side by side where they fit (an iPad), a strip to swipe where they do not.
+                    ViewThatFits(in: .horizontal) {
+                        track(flexible: true)
+                            .keyGlass()
+                        ScrollViewReader { proxy in
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                track(flexible: false)
+                            }
+                            .modifier(FadingWhereCut())
+                            .onAppear {
+                                // The first lengths are in view as it is; one further along
+                                // is brought to the middle.
+                                if isPreset && model.duration > 10 * 60 {
+                                    proxy.scrollTo(model.duration, anchor: .center)
+                                }
                             }
                         }
+                        .clipShape(Capsule())
+                        .keyGlass()
                     }
+                    // Any other length. Never lit: the line above the row says what the
+                    // length is, and a light here would hop on and off as the nudge keys
+                    // pass the lengths in the track.
+                    Button { sheet = .length } label: {
+                        Image(systemName: "pencil")
+                            .font(.body.weight(.semibold))
+                    }
+                    .buttonStyle(KeyStyle())
+                    .frame(width: 44)
+                    .accessibilityLabel("Custom length")
+                    .accessibilityValue(isPreset ? "" : TimerModel.format(Int(model.duration)))
                 }
-                // The amber glides from one length in the row to another. A length that is not
-                // in the row lights nothing: the key at the far end used to light for it, so
-                // stepping the time threw the highlight to that end and back at every length
-                // it passed. Passing one with the nudge keys lights it without a glide either
-                // (`TimerModel.step`).
-                .animation(Motion.glide, value: model.duration)
                 .sensoryFeedback(.selection, trigger: picks)
             case .stopwatch:
                 Button { sheet = .elapsed } label: {
                     Label("Add time already spent…", systemImage: "clock.arrow.circlepath")
                         .font(.subheadline.weight(.semibold))
                 }
-                .buttonStyle(KeyStyle(radius: 12))
+                .buttonStyle(KeyStyle())
             }
         }
         .frame(height: 44)
@@ -447,34 +451,16 @@ private struct LengthRow: View {
         }
     }
 
-    private var isCustom: Bool {
-        !Self.presets.contains { TimeInterval($0 * 60) == model.duration }
+    private var isPreset: Bool {
+        Self.presets.contains { TimeInterval($0 * 60) == model.duration }
     }
 
-    private func chips(flexible: Bool) -> some View {
-        HStack(spacing: 8) {
-            ForEach(Self.presets, id: \.self) { minutes in
-                let seconds = TimeInterval(minutes * 60)
-                Button("\(minutes)m") { pick(seconds) }
-                    .buttonStyle(ChipStyle(
-                        selected: model.duration == seconds,
-                        flexible: flexible,
-                        padding: 4,
-                        selection: flexible ? spread : strip
-                    ))
-                    .id(seconds)
-                    .accessibilityLabel(minutes == 1 ? "1 minute" : "\(minutes) minutes")
-                    .accessibilityAddTraits(model.duration == seconds ? .isSelected : [])
-            }
-            // Always the pencil, never lit: the line above the row says what the length is.
-            Button { sheet = .length } label: {
-                Image(systemName: "pencil")
-            }
-            .buttonStyle(ChipStyle(flexible: flexible, padding: 8))
-            .id(Self.customID)
-            .accessibilityLabel("Custom length")
-            .accessibilityValue(isCustom ? TimerModel.format(Int(model.duration)) : "")
-        }
+    private func track(flexible: Bool) -> some View {
+        LengthTrack(presets: Self.presets, chosen: model.duration, flexible: flexible) { pick($0) }
+            // The amber glides from one length to another. A length that is not in the track
+            // lights nothing, and one reached with the nudge keys lights without a glide
+            // (`TimerModel.step`): the highlight must not travel while a key is held.
+            .animation(Motion.glide, value: model.duration)
     }
 
     private func pick(_ seconds: TimeInterval) {
@@ -488,5 +474,138 @@ private struct LengthRow: View {
     private func choose(_ seconds: TimeInterval) {
         picks += 1
         model.setDuration(seconds)
+    }
+}
+
+/// The lengths as one track, with a lozenge of amber on the chosen one.
+///
+/// The lozenge is one view that moves, not a fill in every key that swaps: two fills that
+/// cross-faded on the way left the amber almost invisible for the first part of the glide. The
+/// labels are drawn twice, light for the track and dark for the amber, the dark ones cut to the
+/// lozenge's shape, so a label is legible wherever the lozenge is over it.
+private struct LengthTrack: View {
+    var presets: [Int]
+    var chosen: TimeInterval
+    /// Sharing the width equally, or each as wide as it needs for a strip that scrolls.
+    var flexible: Bool
+    var pick: (TimeInterval) -> Void
+
+    /// How far the lozenge sits inside a key, which is as tall as the track.
+    private static let inset = CGSize(width: 2, height: 4)
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(presets, id: \.self) { minutes in
+                let seconds = TimeInterval(minutes * 60)
+                Button { pick(seconds) } label: {
+                    label(minutes).foregroundStyle(Theme.text)
+                }
+                .buttonStyle(SegmentStyle(inset: Self.inset))
+                .anchorPreference(key: ChosenBounds.self, value: .bounds) { chosen == seconds ? $0 : nil }
+                .id(seconds)
+                .accessibilityLabel(minutes == 1 ? "1 minute" : "\(minutes) minutes")
+                .accessibilityAddTraits(chosen == seconds ? .isSelected : [])
+            }
+        }
+        .padding(.horizontal, Self.inset.width)
+        .overlayPreferenceValue(ChosenBounds.self) { anchor in
+            GeometryReader { proxy in
+                if let anchor {
+                    let rect = proxy[anchor].insetBy(dx: Self.inset.width, dy: Self.inset.height)
+                    ZStack {
+                        lozenge(rect).foregroundStyle(Theme.amber)
+                        HStack(spacing: 0) {
+                            ForEach(presets, id: \.self) { minutes in
+                                label(minutes).foregroundStyle(Theme.onAmber)
+                            }
+                        }
+                        .padding(.horizontal, Self.inset.width)
+                        .mask { lozenge(rect) }
+                    }
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .transition(AnyTransition.opacity)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func label(_ minutes: Int) -> some View {
+        Text("\(minutes)m")
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .frame(minWidth: 54, maxWidth: flexible ? .infinity : nil)
+            .frame(height: 44)
+    }
+
+    private func lozenge(_ rect: CGRect) -> some View {
+        Capsule()
+            .frame(width: rect.width, height: rect.height)
+            .position(x: rect.midX, y: rect.midY)
+    }
+}
+
+/// For the strip of lengths inside its track: an end where more lengths are out of view fades
+/// out, so a label is never cut through by the track's edge, and an end with nothing beyond it
+/// is left alone. Knowing how far a strip is scrolled takes iOS 18; before that the labels are
+/// cut by the edge as they were.
+private struct FadingWhereCut: ViewModifier {
+    @State private var hidden = Hidden()
+
+    /// How strongly each end fades, 0 to 1: all the way once 12 points are out of view there.
+    private struct Hidden: Equatable {
+        var leading: CGFloat = 0
+        var trailing: CGFloat = 0
+    }
+
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .onScrollGeometryChange(for: Hidden.self) { geometry in
+                    let before = geometry.visibleRect.minX
+                    let after = geometry.contentSize.width - geometry.visibleRect.maxX
+                    return Hidden(leading: min(max(before / 12, 0), 1), trailing: min(max(after / 12, 0), 1))
+                } action: { _, hidden in
+                    self.hidden = hidden
+                }
+                .mask {
+                    HStack(spacing: 0) {
+                        LinearGradient(colors: [.black.opacity(1 - hidden.leading), .black], startPoint: .leading, endPoint: .trailing)
+                            .frame(width: 28)
+                        Color.black
+                        LinearGradient(colors: [.black, .black.opacity(1 - hidden.trailing)], startPoint: .leading, endPoint: .trailing)
+                            .frame(width: 28)
+                    }
+                }
+        } else {
+            content
+        }
+    }
+}
+
+/// Where the chosen length's key is, for the lozenge. Nothing when no key is chosen.
+private struct ChosenBounds: PreferenceKey {
+    static var defaultValue: Anchor<CGRect>? { nil }
+
+    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
+        value = value ?? nextValue()
+    }
+}
+
+/// A key in the track: no body of its own, only a light under the finger.
+private struct SegmentStyle: ButtonStyle {
+    var inset: CGSize
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background {
+                Capsule()
+                    .fill(.white.opacity(configuration.isPressed ? 0.14 : 0))
+                    .padding(.horizontal, inset.width)
+                    .padding(.vertical, inset.height)
+            }
+            .contentShape(Rectangle())
+            .animation(Motion.press, value: configuration.isPressed)
     }
 }

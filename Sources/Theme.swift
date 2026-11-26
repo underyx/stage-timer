@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The control surface's palette and its two kinds of button.
+/// The control surface's palette.
 ///
 /// The colours come from the app icon: a warm charcoal room, the cream of the TV's body, the
 /// amber of its screen. The surface is always dark, whatever the system appearance: an operator's
@@ -15,6 +15,22 @@ enum Theme {
     /// One step up again, for a key on a raised card.
     static let lifted = Color(red: 0.227, green: 0.216, blue: 0.200)
     static let hairline = Color.white.opacity(0.08)
+
+    /// Whether keys are Liquid Glass where the system has it. Always true in the app. The
+    /// tests turn it off to draw the surface as iOS 17 and 18 have it, which no simulator in CI
+    /// runs. Unsafe by the compiler's lights only: nothing but a test writes it.
+    nonisolated(unsafe) static var glass = true
+
+    /// Whether a key that asks for glass is drawn as glass here.
+    static func draws(glass wanted: Bool) -> Bool {
+        if #available(iOS 26.0, *) { return wanted && glass }
+        return false
+    }
+
+    /// The corners of a card, and of the monitor. Keys are capsules and have none to choose.
+    static let cardRadius: CGFloat = 26
+    /// A card inside a sheet or beside the controls, with rows in it.
+    static let groupRadius: CGFloat = 22
 
     static let text = Color(red: 0.953, green: 0.933, blue: 0.902)
     /// 9:1 on `ground`, 7:1 on `raised`.
@@ -53,6 +69,17 @@ enum Motion {
     /// Something changing what it is: Start becoming Pause, a card going live.
     static var state: Animation { paced(.spring(duration: 0.42, bounce: 0.16)) }
     static var fade: Animation { paced(.easeInOut(duration: 0.3)) }
+    /// One word taking another's place: the old one is gone before the new one arrives. Two
+    /// words fading through each other in the same place are neither of them for a moment, and
+    /// on the Start key that moment was a third of the change. The old word does not fade out
+    /// either: it stays where it was while the icon beside it is already where the new word
+    /// wants it, and a longer word leaving had the icon against its first letter.
+    static var swap: AnyTransition {
+        AnyTransition.asymmetric(
+            insertion: AnyTransition.opacity.animation(paced(.easeOut(duration: 0.18).delay(0.02))),
+            removal: AnyTransition.opacity.animation(paced(.linear(duration: 0.02)))
+        )
+    }
 
     /// Any other curve, at the pace the rest is moving at.
     static func paced(_ animation: Animation) -> Animation {
@@ -60,14 +87,28 @@ enum Motion {
     }
 }
 
-/// A key: fills whatever frame it is given, so rows of keys are sized by their row.
+// MARK: - Keys
+
+/// A key: a capsule that fills whatever frame it is given, so rows of keys are sized by their row.
+///
+/// A key that sits straight on the ground is Liquid Glass where the system has it (iOS 26 and
+/// later) and a flat fill before that. A key on a card is always a flat fill: the cards are the
+/// content, and glass is for what floats over it.
 struct KeyStyle: ButtonStyle {
+    /// The flat fill: on a card, and everywhere before iOS 26.
     var fill = Theme.surface
     var ink = Theme.text
-    var radius: CGFloat = 14
+    /// What the glass is tinted with. Nothing, for every key but the one to press.
+    var tint: Color?
+    var glass = true
 
-    static func primary(radius: CGFloat = 14) -> KeyStyle {
-        KeyStyle(fill: Theme.amber, ink: Theme.onAmber, radius: radius)
+    static func primary(glass: Bool = true) -> KeyStyle {
+        KeyStyle(fill: Theme.amber, ink: Theme.onAmber, tint: Theme.amber, glass: glass)
+    }
+
+    /// A key on a card.
+    static func flat(_ fill: Color) -> KeyStyle {
+        KeyStyle(fill: fill, glass: false)
     }
 
     func makeBody(configuration: Configuration) -> some View {
@@ -81,60 +122,157 @@ struct KeyStyle: ButtonStyle {
         @Environment(\.isEnabled) private var isEnabled
 
         var body: some View {
-            let shape = RoundedRectangle(cornerRadius: style.radius, style: .continuous)
-            configuration.label
+            let label = configuration.label
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .foregroundStyle(style.ink)
-                .background(style.fill, in: shape)
-                .overlay { shape.fill(.white.opacity(configuration.isPressed ? 0.14 : 0)) }
+                .ink(style.ink, glass: Theme.draws(glass: style.glass))
+            if #available(iOS 26.0, *) {
+                if style.glass && Theme.glass {
+                    // The glass answers a finger itself, so nothing is drawn here for a press.
+                    label
+                        .opacity(isEnabled ? 1 : 0.4)
+                        .glassEffect(.regular.tint(style.tint).interactive(), in: Capsule())
+                        .animation(Motion.state, value: style.tint)
+                        .contentShape(Capsule())
+                } else {
+                    flat(label)
+                }
+            } else {
+                flat(label)
+            }
+        }
+
+        private func flat(_ label: some View) -> some View {
+            label
+                .background(style.fill, in: Capsule())
+                .overlay { Capsule().fill(.white.opacity(configuration.isPressed ? 0.14 : 0)) }
                 .opacity(isEnabled ? 1 : 0.4)
                 .scaleEffect(configuration.isPressed ? 0.97 : 1)
                 .animation(Motion.press, value: configuration.isPressed)
                 .animation(Motion.state, value: style.fill)
-                .contentShape(shape)
+                .contentShape(Capsule())
         }
     }
 }
 
-/// A chip: as wide as its label (or, `flexible`, sharing its row equally), amber when selected.
+/// A chip: a capsule as wide as its label, amber when selected. Glass or flat as a key is.
 struct ChipStyle: ButtonStyle {
     var selected = false
     var fill = Theme.surface
-    var radius: CGFloat = 12
-    var flexible = false
-    var padding: CGFloat = 14
-    /// Chips in one row share a namespace so the amber glides from the old choice to the new one.
-    var selection: Namespace.ID?
+    var glass = true
 
     func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        configuration.label
-            .font(.subheadline.weight(selected ? .bold : .medium))
+        let label = configuration.label
+            .font(.subheadline.weight(.semibold))
             .lineLimit(1)
-            .foregroundStyle(selected ? Theme.onAmber : Theme.text)
-            .padding(.horizontal, padding)
-            .frame(minWidth: 50, maxWidth: flexible ? .infinity : nil, minHeight: 44)
-            .background {
-                ZStack {
-                    shape.fill(fill)
-                    if let selection {
-                        if selected {
-                            shape.fill(Theme.amber).matchedGeometryEffect(id: "selected", in: selection)
-                        }
-                    } else {
-                        // Always there and faded, not put in and taken out: taken out, it went
-                        // at once, and the label was dark on dark until its own fade was done.
-                        shape.fill(Theme.amber).opacity(selected ? 1 : 0)
-                    }
-                }
+            .ink(selected ? Theme.onAmber : Theme.text, glass: Theme.draws(glass: glass))
+            .padding(.horizontal, 16)
+            .frame(minWidth: 50, minHeight: 44)
+        if #available(iOS 26.0, *) {
+            if glass && Theme.glass {
+                label
+                    .glassEffect(.regular.tint(selected ? Theme.amber : nil).interactive(), in: Capsule())
+                    .contentShape(Capsule())
+            } else {
+                flat(label, pressed: configuration.isPressed)
             }
-            .overlay { shape.fill(.white.opacity(configuration.isPressed ? 0.14 : 0)) }
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(Motion.press, value: configuration.isPressed)
-            .contentShape(shape)
+        } else {
+            flat(label, pressed: configuration.isPressed)
+        }
+    }
+
+    private func flat(_ label: some View, pressed: Bool) -> some View {
+        label
+            .background(selected ? Theme.amber : fill, in: Capsule())
+            .overlay { Capsule().fill(.white.opacity(pressed ? 0.14 : 0)) }
+            .scaleEffect(pressed ? 0.96 : 1)
+            .animation(Motion.press, value: pressed)
+            .contentShape(Capsule())
+    }
+}
+
+/// The word on a key that says something else when the key's state changes.
+struct KeyTitle: View {
+    var text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        ZStack {
+            Text(text)
+                .id(text)
+                .transition(Motion.swap)
+        }
+        .animation(Motion.state, value: text)
+    }
+}
+
+/// The ink of a key whose body turns amber and back: light on the dark, dark on amber.
+///
+/// The ink never fades from one to the other. Half way there it is a grey, on a body that is
+/// half way to amber, and the word cannot be read; and an animation scoped to the foreground
+/// style did not reach the words, which faded with the body whatever it said. So what animates
+/// here is a number, how far the body is on its way to amber, on whatever curve the body is
+/// changing on; the ink is one or the other by where that number is, and changes at a stroke.
+///
+/// Light ink reads on the dark and on the brown half way, dark ink only on amber. A flat fill is
+/// where the number says it is. Glass takes its tint later than that, so on glass the ink waits
+/// for the number to be nearly there in either direction.
+private struct Ink: ViewModifier, Animatable {
+    /// How far the body is on its way to amber, 0 to 1.
+    var amber: Double
+    var ink: Color
+    var glass: Bool
+
+    init(_ ink: Color, glass: Bool) {
+        self.amber = ink == Theme.onAmber ? 1 : 0
+        self.ink = ink
+        self.glass = glass
+    }
+
+    nonisolated var animatableData: Double {
+        get { amber }
+        set { amber = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content.foregroundStyle(drawn)
+    }
+
+    private var drawn: Color {
+        let dark = ink == Theme.onAmber
+        let turn = glass ? (dark ? 0.85 : 0.3) : 0.6
+        if amber > turn { return Theme.onAmber }
+        return dark ? Theme.text : ink
+    }
+}
+
+extension View {
+    /// The ink of a key's words, changed at a stroke part of the way through the body's change (`Ink`).
+    func ink(_ ink: Color, glass: Bool) -> some View {
+        modifier(Ink(ink, glass: glass))
+    }
+
+    /// The body of something that is not a `Button` but sits on the ground like a key: Liquid
+    /// Glass where the system has it, the flat fill before that. `lit` floods it with a colour
+    /// (Reset while it is held); the colour is drawn in the glass, not as a tint of it, so that
+    /// it fades in and out like any other fill.
+    @ViewBuilder
+    func keyGlass(lit: Color? = nil, fallback: Color = Theme.surface) -> some View {
+        if #available(iOS 26.0, *) {
+            if Theme.glass {
+                background(lit ?? .clear, in: Capsule())
+                    .glassEffect(.regular, in: Capsule())
+            } else {
+                background(lit ?? fallback, in: Capsule())
+            }
+        } else {
+            background(lit ?? fallback, in: Capsule())
+        }
     }
 }
 

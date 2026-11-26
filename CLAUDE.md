@@ -55,12 +55,23 @@ to a view, and add a shot for a new state.
 
 **A change that animates is filmed, and the film is read before it ships.** The same tests make one
 change on a mounted view and keep the frames while it settles, in `build/screenshots/motion/<name>/`
-(file names are milliseconds since the change, at a quarter of the app's speed: `Motion.slowdown`).
+(file names are milliseconds since the change, at a quarter of the app's speed and an eighth for a
+view with glass in it, which takes four times as long to draw: `Motion.slowdown`).
 Build 1.2 (9) went to TestFlight on stills alone, and the owner found three animation glitches in
 ten minutes, each between two stills that looked right. Add a film for anything new that moves. An
 animation that does not come from `Motion` (use `Motion.paced` for a one-off) is not slowed and is
 over in two frames. Still unseen: what a finger adds (a key going down, the hold on Reset), what
 the system animates at its own pace, and haptics.
+
+**Liquid Glass is only drawn truly on the simulator's own screen.** It is made from what is behind
+it there; past the screen's edge it is given the edge's last column of pixels, and a key showed a
+band of the key beside it. The views drawn are larger than a phone's screen, so `picture` moves a
+view across the screen, waits (glass that has just come onto the screen is not drawn yet: a key was
+dark), and keeps a screenful from each drawing. A film is of one screenful (`part`, the top left one
+unless the film says otherwise), so no frame waits for a move. A size whose monitor would be in two
+pieces, which take long enough apart for the time to change between them, is drawn whole once and
+only its keys again in pieces: `Device.keys` says where they are, and a key moved out of those
+rectangles is drawn wrongly. A device with `glass` off is drawn in one go, as the display is.
 
 CI cannot see a real external display, AirPlay, Stage Manager or the lock button. A change to the
 scene code or `LockKeepalive` is unverified until someone runs it on hardware, whatever CI says.
@@ -90,6 +101,11 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   calls `reset()`, `setDuration` or sets `mode` needs the same guard.
 - **The control surface is always dark and never follows the system appearance** (`Theme`): it is
   used in dimmed rooms. Colours come from `Theme`, not from system colours or materials.
+- **Liquid Glass is for a key that sits straight on the ground, and only through `KeyStyle`,
+  `ChipStyle` and `keyGlass`** (`Theme`). Cards, and keys on a card, stay flat fills: glass is for
+  what floats over content, and Apple asks for few of them on screen. The deployment target is
+  still iOS 17, so every use is behind `#available(iOS 26.0, *)` with the flat fill beside it;
+  the `flat-*` screenshots draw that path (`Theme.glass` off), since no simulator in CI runs it.
 - **The display's digits are scaled, not re-set, to make room for a message** (`DisplayView`):
   a font size does not animate. Their size is worked out for the widest time the run will show,
   so it does not jump at 9:59; `ems` there is an estimate of SF Rounded's widths.
@@ -102,6 +118,13 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   as state and starts the fade with `withAnimation` from `onChange`. Amber to red at zero is no
   animation at all but a blend by the time past zero: an animation under the overtime pulse,
   which changes the colour every tick, sent the digits through cyan and green.
+- **Words that change on a key go through `KeyTitle`, and a key's ink through `View.ink`.** Two
+  titles cross-fading in one place were neither for a third of the change, so the old word goes at
+  once and the new one fades in. Ink fading along with a body that turns amber is grey on brown
+  halfway, and an animation scoped to the foreground style did not stop it: `Ink` animates a
+  number along with the body and draws one ink or the other by where the number is. Don't time it
+  with a `Task` instead: a film stalls animations for its first half second and not a clock, so
+  the film showed the ink turning on a body that had not moved.
 - **A control must not change size when its state does.** The Black out key has one title and
   lays out both of its icons: when it grew to say "Blacked out", its amber fill arrived outside
   the margin, and a key held at that width left no room for the line beside it.
@@ -177,8 +200,6 @@ changing signing, the export options or the workflow.
   the key's or the script's.** The owner has an agreement to accept at developer.apple.com/account;
   nobody else can. It took effect about eight minutes after he accepted (2026-11-25): re-run the
   failed job, don't rotate the key or repeat the setup.
-- **The upload and the tag push have not run on GitHub yet** (as of 2026-11-25; dry runs pass).
-  Delete this entry after the first real release from the workflow.
 
 ## Writing things down
 

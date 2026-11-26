@@ -14,7 +14,7 @@ struct MessageCard: View {
     var body: some View {
         @Bindable var model = model
         let live = model.showMessage
-        let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
 
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -34,12 +34,11 @@ struct MessageCard: View {
                 .submitLabel(.done)
                 .font(.body)
                 .foregroundStyle(Theme.text)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 18)
                 .frame(height: 46)
-                .background(Theme.ground, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(Theme.ground, in: Capsule())
                 .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(editing ? Theme.amber.opacity(0.7) : Theme.hairline)
+                    Capsule().strokeBorder(editing ? Theme.amber.opacity(0.7) : Theme.hairline)
                 }
                 .animation(Motion.fade, value: editing)
 
@@ -47,7 +46,7 @@ struct MessageCard: View {
                 HStack(spacing: 8) {
                     ForEach(Self.presets, id: \.self) { text in
                         Button(text) { model.message = text }
-                            .buttonStyle(ChipStyle(fill: Theme.raised, radius: 22))
+                            .buttonStyle(ChipStyle(fill: Theme.raised, glass: false))
                     }
                 }
             }
@@ -55,14 +54,14 @@ struct MessageCard: View {
 
             Button { model.showMessage.toggle() } label: {
                 Label {
-                    Text(live ? "Hide from screen" : "Show on screen").contentTransition(.opacity)
+                    KeyTitle(live ? "Hide from screen" : "Show on screen")
                 } icon: {
                     Image(systemName: live ? "eye.slash" : "display")
                         .contentTransition(.symbolEffect(.replace))
                 }
                 .font(.callout.weight(.semibold))
             }
-            .buttonStyle(live ? KeyStyle.primary() : KeyStyle(fill: Theme.raised))
+            .buttonStyle(live ? KeyStyle.primary(glass: false) : KeyStyle.flat(Theme.raised))
             .frame(height: 48)
             .disabled(model.message.isEmpty)
         }

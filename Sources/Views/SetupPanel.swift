@@ -110,7 +110,7 @@ private struct SetupCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).sectionLabel().padding(.horizontal, 4)
             VStack(spacing: 0) { content }
-                .background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(fill, in: RoundedRectangle(cornerRadius: Theme.groupRadius, style: .continuous))
             if let footer {
                 Text(footer)
                     .font(.footnote)
@@ -150,7 +150,7 @@ private struct RowDivider: View {
         Rectangle()
             .fill(Theme.hairline)
             .frame(height: 1)
-            .padding(.leading, 14)
+            .padding(.leading, 16)
     }
 }
 
@@ -158,7 +158,7 @@ private extension View {
     func setupRow() -> some View {
         font(.body)
             .foregroundStyle(Theme.text)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .frame(minHeight: 52)
     }
 }
@@ -193,18 +193,18 @@ private struct ConnectionCard: View {
                 if kinds.contains(.window) {
                     Button("Close the display window") { DisplaySceneDelegate.closeWindows() }
                         .font(.subheadline.weight(.semibold))
-                        .buttonStyle(KeyStyle(fill: keyFill, radius: 12))
+                        .buttonStyle(KeyStyle.flat(keyFill))
                         .frame(height: 44)
                 } else if multipleScenes {
                     Button("Open a display window") { DisplaySceneDelegate.open() }
                         .font(.subheadline.weight(.semibold))
-                        .buttonStyle(KeyStyle(fill: keyFill, radius: 12))
+                        .buttonStyle(KeyStyle.flat(keyFill))
                         .frame(height: 44)
                 }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(fill, in: RoundedRectangle(cornerRadius: Theme.groupRadius, style: .continuous))
             .animation(Motion.state, value: kinds)
         }
     }
@@ -239,11 +239,14 @@ struct DurationPicker: View {
                     }
                     .pickerStyle(.segmented)
                 }
+                // The wheels stand in a well of the ground colour, as the message does in its card.
                 HStack(spacing: 0) {
                     wheel($h, 0..<24, "h")
                     wheel($m, 0..<60, "min")
                     wheel($s, 0..<60, "s")
                 }
+                .padding(.horizontal, 8)
+                .background(Theme.ground, in: RoundedRectangle(cornerRadius: Theme.groupRadius, style: .continuous))
             }
             .padding()
             .navigationTitle(title)
@@ -261,6 +264,9 @@ struct DurationPicker: View {
             }
         }
         .presentationDetents([.medium])
+        // The surface colour, not the glass the system would give a sheet that stops halfway:
+        // through that the Start key behind lit the title up in amber, and the sheet is read
+        // in the same dim room as the rest.
         .presentationBackground(Theme.surface)
         .tint(Theme.amber)
         .preferredColorScheme(.dark)
