@@ -41,12 +41,24 @@ job alone says nothing about the app. Say so in the PR if something merged witho
 `.github/workflows/ci.yml` runs on every pull request and every push to main:
 
 - `app`, on GitHub's `xcode-27` image: `make test`, then `make build`. The repository variable
-  `IOS_RUNS_ON` (JSON) points it at another image or a self-hosted Mac.
+  `IOS_RUNS_ON` (JSON) points it at another image.
 - `core`, on Linux in the `swift:6.4` container: `swift test`.
 
-The repository is private, so the `app` job's minutes bill at about ten times the Linux rate.
-That is why a change that touches only `**.md` starts no run, and why a newer push cancels the
-run before it. Don't add a second macOS job or a matrix without a reason worth that.
+**The repository is public** (since 2026-11-26; private, the `app` job billed at about ten times
+the Linux rate and ran the account out of minutes). CI minutes are free now. A change that touches
+only `**.md` still starts no run and a newer push still cancels the run before it.
+
+- **Everything here is read by strangers**: code, commit messages, pull requests, CI logs and the
+  `screenshots` artifact. No credential, private hostname or other person's details in any of them.
+  Secret scanning with push protection is on.
+- **No self-hosted runner on this repository, and no `pull_request_target`.** A pull request from a
+  fork runs its own copy of the workflow files: with no secrets and a read-only token that is
+  harmless on GitHub's runners, and it is code from a stranger on the owner's Mac on a self-hosted
+  one. `IOS_RUNS_ON` stays a GitHub image. Workflow runs for outside contributors wait for the
+  owner's approval (Settings, Actions); don't loosen that.
+- **Only the owner can upload.** The TestFlight release is `workflow_dispatch`, which needs write
+  access, and the signing secrets never reach a fork's run. Don't give the release a trigger that
+  an outsider can cause (a comment, a label, a fork's pull request).
 
 **CI is also where the app is first seen.** `Tests/App/ScreenshotTests.swift` draws the real views
 in the states a talk goes through into `build/screenshots/` during `make test`, and the `app` job
