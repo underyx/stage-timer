@@ -90,6 +90,11 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   calls `reset()`, `setDuration` or sets `mode` needs the same guard.
 - **The control surface is always dark and never follows the system appearance** (`Theme`): it is
   used in dimmed rooms. Colours come from `Theme`, not from system colours or materials.
+- **Liquid Glass is for a key that sits straight on the ground, and only through `KeyStyle`,
+  `ChipStyle` and `keyGlass`** (`Theme`). Cards, and keys on a card, stay flat fills: glass is for
+  what floats over content, and Apple asks for few of them on screen. The deployment target is
+  still iOS 17, so every use is behind `#available(iOS 26.0, *)` with the flat fill beside it;
+  the `flat-*` screenshots draw that path (`Theme.glass` off), since no simulator in CI runs it.
 - **The display's digits are scaled, not re-set, to make room for a message** (`DisplayView`):
   a font size does not animate. Their size is worked out for the widest time the run will show,
   so it does not jump at 9:59; `ems` there is an estimate of SF Rounded's widths.

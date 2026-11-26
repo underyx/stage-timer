@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The control surface's palette and its two kinds of button.
+/// The control surface's palette.
 ///
 /// The colours come from the app icon: a warm charcoal room, the cream of the TV's body, the
 /// amber of its screen. The surface is always dark, whatever the system appearance: an operator's
@@ -15,6 +15,16 @@ enum Theme {
     /// One step up again, for a key on a raised card.
     static let lifted = Color(red: 0.227, green: 0.216, blue: 0.200)
     static let hairline = Color.white.opacity(0.08)
+
+    /// Whether keys are Liquid Glass where the system has it. Always true in the app. The
+    /// tests turn it off to draw the surface as iOS 17 and 18 have it, which no simulator in CI
+    /// runs. Unsafe by the compiler's lights only: nothing but a test writes it.
+    nonisolated(unsafe) static var glass = true
+
+    /// The corners of a card, and of the monitor. Keys are capsules and have none to choose.
+    static let cardRadius: CGFloat = 26
+    /// A card inside a sheet or beside the controls, with rows in it.
+    static let groupRadius: CGFloat = 22
 
     static let text = Color(red: 0.953, green: 0.933, blue: 0.902)
     /// 9:1 on `ground`, 7:1 on `raised`.
@@ -60,14 +70,28 @@ enum Motion {
     }
 }
 
-/// A key: fills whatever frame it is given, so rows of keys are sized by their row.
+// MARK: - Keys
+
+/// A key: a capsule that fills whatever frame it is given, so rows of keys are sized by their row.
+///
+/// A key that sits straight on the ground is Liquid Glass where the system has it (iOS 26 and
+/// later) and a flat fill before that. A key on a card is always a flat fill: the cards are the
+/// content, and glass is for what floats over it.
 struct KeyStyle: ButtonStyle {
+    /// The flat fill: on a card, and everywhere before iOS 26.
     var fill = Theme.surface
     var ink = Theme.text
-    var radius: CGFloat = 14
+    /// What the glass is tinted with. Nothing, for every key but the one to press.
+    var tint: Color?
+    var glass = true
 
-    static func primary(radius: CGFloat = 14) -> KeyStyle {
-        KeyStyle(fill: Theme.amber, ink: Theme.onAmber, radius: radius)
+    static func primary(glass: Bool = true) -> KeyStyle {
+        KeyStyle(fill: Theme.amber, ink: Theme.onAmber, tint: Theme.amber, glass: glass)
+    }
+
+    /// A key on a card.
+    static func flat(_ fill: Color) -> KeyStyle {
+        KeyStyle(fill: fill, glass: false)
     }
 
     func makeBody(configuration: Configuration) -> some View {
@@ -81,60 +105,106 @@ struct KeyStyle: ButtonStyle {
         @Environment(\.isEnabled) private var isEnabled
 
         var body: some View {
-            let shape = RoundedRectangle(cornerRadius: style.radius, style: .continuous)
-            configuration.label
+            let label = configuration.label
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .foregroundStyle(style.ink)
-                .background(style.fill, in: shape)
-                .overlay { shape.fill(.white.opacity(configuration.isPressed ? 0.14 : 0)) }
+                .animation(Motion.state, value: style.ink)
+            if #available(iOS 26.0, *) {
+                if style.glass && Theme.glass {
+                    // The glass answers a finger itself, so nothing is drawn here for a press.
+                    label
+                        .opacity(isEnabled ? 1 : 0.4)
+                        .glassEffect(.regular.tint(style.tint).interactive(), in: Capsule())
+                        .animation(Motion.state, value: style.tint)
+                        .contentShape(Capsule())
+                } else {
+                    flat(label)
+                }
+            } else {
+                flat(label)
+            }
+        }
+
+        private func flat(_ label: some View) -> some View {
+            label
+                .background(style.fill, in: Capsule())
+                .overlay { Capsule().fill(.white.opacity(configuration.isPressed ? 0.14 : 0)) }
                 .opacity(isEnabled ? 1 : 0.4)
                 .scaleEffect(configuration.isPressed ? 0.97 : 1)
                 .animation(Motion.press, value: configuration.isPressed)
                 .animation(Motion.state, value: style.fill)
-                .contentShape(shape)
+                .contentShape(Capsule())
         }
     }
 }
 
-/// A chip: as wide as its label (or, `flexible`, sharing its row equally), amber when selected.
+/// A chip: a capsule as wide as its label, amber when selected. Glass or flat as a key is.
 struct ChipStyle: ButtonStyle {
     var selected = false
     var fill = Theme.surface
-    var radius: CGFloat = 12
-    var flexible = false
-    var padding: CGFloat = 14
-    /// Chips in one row share a namespace so the amber glides from the old choice to the new one.
-    var selection: Namespace.ID?
+    var glass = true
 
     func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        configuration.label
-            .font(.subheadline.weight(selected ? .bold : .medium))
+        let label = configuration.label
+            .font(.subheadline.weight(.semibold))
             .lineLimit(1)
             .foregroundStyle(selected ? Theme.onAmber : Theme.text)
-            .padding(.horizontal, padding)
-            .frame(minWidth: 50, maxWidth: flexible ? .infinity : nil, minHeight: 44)
-            .background {
-                ZStack {
-                    shape.fill(fill)
-                    if let selection {
-                        if selected {
-                            shape.fill(Theme.amber).matchedGeometryEffect(id: "selected", in: selection)
-                        }
-                    } else {
-                        // Always there and faded, not put in and taken out: taken out, it went
-                        // at once, and the label was dark on dark until its own fade was done.
-                        shape.fill(Theme.amber).opacity(selected ? 1 : 0)
-                    }
-                }
+            .padding(.horizontal, 16)
+            .frame(minWidth: 50, minHeight: 44)
+        if #available(iOS 26.0, *) {
+            if glass && Theme.glass {
+                label
+                    .glassEffect(.regular.tint(selected ? Theme.amber : nil).interactive(), in: Capsule())
+                    .contentShape(Capsule())
+            } else {
+                flat(label, pressed: configuration.isPressed)
             }
-            .overlay { shape.fill(.white.opacity(configuration.isPressed ? 0.14 : 0)) }
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(Motion.press, value: configuration.isPressed)
-            .contentShape(shape)
+        } else {
+            flat(label, pressed: configuration.isPressed)
+        }
+    }
+
+    private func flat(_ label: some View, pressed: Bool) -> some View {
+        label
+            .background(selected ? Theme.amber : fill, in: Capsule())
+            .overlay { Capsule().fill(.white.opacity(pressed ? 0.14 : 0)) }
+            .scaleEffect(pressed ? 0.96 : 1)
+            .animation(Motion.press, value: pressed)
+            .contentShape(Capsule())
+    }
+}
+
+extension View {
+    /// The body of something that is not a `Button` but sits on the ground like a key: Liquid
+    /// Glass where the system has it, the flat fill before that. `lit` floods it with a colour
+    /// (Reset while it is held); the colour is drawn in the glass, not as a tint of it, so that
+    /// it fades in and out like any other fill.
+    @ViewBuilder
+    func keyGlass(lit: Color? = nil, fallback: Color = Theme.surface) -> some View {
+        if #available(iOS 26.0, *) {
+            if Theme.glass {
+                background(lit ?? .clear, in: Capsule())
+                    .glassEffect(.regular, in: Capsule())
+            } else {
+                background(lit ?? fallback, in: Capsule())
+            }
+        } else {
+            background(lit ?? fallback, in: Capsule())
+        }
+    }
+
+    /// A sheet that stops halfway is glass where the system has it. Before that it is the
+    /// surface colour, like the cards.
+    @ViewBuilder
+    func sheetGround() -> some View {
+        if #available(iOS 26.0, *) {
+            self
+        } else {
+            presentationBackground(Theme.surface)
+        }
     }
 }
 

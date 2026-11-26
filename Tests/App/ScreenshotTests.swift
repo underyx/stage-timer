@@ -96,6 +96,80 @@ struct ScreenshotTests {
         try await shoot("phone-hold-to-reset", Device(size: CGSize(width: 393, height: 96)), row.environment(timer(elapsed: 30.5)))
     }
 
+    /// A sheet is put up by the system over the whole window, so this one is a picture of the
+    /// window: larger than a phone, with the view in the middle of it. It is here for the
+    /// sheet's material, not for its place.
+    @Test func lengthSheet() async throws {
+        let view = ControlView()
+            .environment(timer())
+            .sheet(isPresented: .constant(true)) {
+                DurationPicker(title: "Length", confirm: "Set", initial: 5 * 60) { _ in }
+            }
+        let (window, _) = try await mount(.phone, view)
+        try await Task.sleep(for: .milliseconds(1500))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 2
+        let image = UIGraphicsImageRenderer(bounds: window.bounds, format: format).image { _ in
+            window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+        }
+        window.rootViewController?.dismiss(animated: false)
+        strike(window)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try #require(image.pngData()).write(to: folder.appendingPathComponent("window-length-sheet.png"))
+    }
+
+    /// TEMPORARY, not for main: what Liquid Glass looks like when it is drawn this way, before
+    /// the design leans on it.
+    @Test func glassProbe() async throws {
+        guard #available(iOS 26.0, *) else { return }
+        let stripes = LinearGradient(
+            stops: stride(from: 0.0, to: 1.0, by: 0.1).flatMap { at in
+                [Gradient.Stop(color: Theme.amber, location: at), .init(color: Theme.amber, location: at + 0.05),
+                 .init(color: Theme.ground, location: at + 0.05), .init(color: Theme.ground, location: at + 0.1)]
+            },
+            startPoint: .leading, endPoint: .trailing
+        )
+        let size = CGSize(width: 220, height: 56)
+        let sheet = VStack(spacing: 14) {
+            Text("plain").frame(width: size.width, height: size.height).glassEffect()
+            Text("interactive").frame(width: size.width, height: size.height).glassEffect(.regular.interactive())
+            Text("tint amber").foregroundStyle(Theme.onAmber).frame(width: size.width, height: size.height)
+                .glassEffect(.regular.tint(Theme.amber))
+            Text("amber inside").foregroundStyle(Theme.onAmber).frame(width: size.width, height: size.height)
+                .background(Theme.amber, in: Capsule()).glassEffect()
+            Text("flat amber").foregroundStyle(Theme.onAmber).frame(width: size.width, height: size.height)
+                .background(Theme.amber, in: Capsule())
+            Text("tint raised").frame(width: size.width, height: size.height).glassEffect(.regular.tint(Theme.raised))
+            Text("clear").frame(width: size.width, height: size.height).glassEffect(.clear)
+            Text("on a card").frame(width: size.width, height: size.height).glassEffect()
+                .padding(14).background(Theme.surface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            Text("over stripes").frame(width: size.width, height: size.height).glassEffect()
+                .padding(14).background(stripes)
+            Text("clear over stripes").frame(width: size.width, height: size.height).glassEffect(.clear)
+                .padding(14).background(stripes)
+        }
+        .font(.headline)
+        .foregroundStyle(Theme.text)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.ground)
+        .preferredColorScheme(.dark)
+        try await shoot("probe-glass", .phone, sheet)
+    }
+
+    /// iOS 17 and 18 have no Liquid Glass and get flat keys of the same shapes. No simulator in
+    /// CI runs those systems, so the same views are drawn here with the glass turned off.
+    @Test func withoutGlass() async throws {
+        Theme.glass = false
+        defer { Theme.glass = true }
+        let model = timer(length: 20 * 60, elapsed: 7 * 60 + 25.5) {
+            $0.message = "5 minutes left"
+            $0.displayConnected(id: "shot", kind: .external)
+        }
+        try await shoot("flat-phone-running", .phone, ControlView().environment(model))
+        try await shoot("flat-phone-ready", .phone, ControlView().environment(timer()))
+        try await shoot("flat-ipad-landscape-running", .tabletLandscape, ControlView().environment(model))
+    }
+
     // MARK: Other sizes
 
     @Test func smallPhone() async throws {
@@ -148,6 +222,40 @@ struct ScreenshotTests {
             $0.showMessage = true
         }
         try await shoot("screen-5-four-by-three", Device(size: CGSize(width: 1024, height: 768), scale: 1), DisplayView().environment(narrow))
+    }
+
+    // MARK: The App Store's pictures
+
+    /// The listing's screenshots, at the two sizes App Store Connect asks for (an iPhone of
+    /// 6.9 inches, an iPad of 13), into `build/screenshots/store/`. They are the real views in
+    /// the states worth showing, with the status bar and home indicator a screenshot would
+    /// have drawn over them: a window in a test has neither.
+    @Test func store() async throws {
+        let running = timer(length: 20 * 60, elapsed: 7 * 60 + 25.5) {
+            $0.displayConnected(id: "shot", kind: .external)
+        }
+        let message = timer(length: 20 * 60, elapsed: 15 * 60 + 0.5) {
+            $0.message = "5 minutes left"
+            $0.showMessage = true
+            $0.displayConnected(id: "shot", kind: .external)
+        }
+        let lastMinute = timer(length: 10 * 60, elapsed: 9 * 60 + 15.5) {
+            $0.message = "Wrap up"
+            $0.showMessage = true
+            $0.displayConnected(id: "shot", kind: .external)
+        }
+        let over = timer(length: 10 * 60, elapsed: 10 * 60 + 42.5) {
+            $0.displayConnected(id: "shot", kind: .external)
+        }
+        let controls: [(name: String, model: TimerModel)] = [
+            ("1-running", running), ("2-message", message), ("3-last-minute", lastMinute), ("4-overtime", over),
+        ]
+        for (name, model) in controls {
+            try await shoot("store/iphone-" + name, .storePhone, StoreChrome(tablet: false) { ControlView() }.environment(model))
+            try await shoot("store/ipad-" + name, .storeTablet, StoreChrome(tablet: true) { ControlView() }.environment(model))
+        }
+        // What the room sees, on the iPad's set as the listing has it today.
+        try await shoot("store/ipad-5-screen", .storeTablet, DisplayView().environment(message))
     }
 
     // MARK: How it moves
@@ -283,6 +391,10 @@ private struct Device {
     static let tabletLandscape = Device(size: CGSize(width: 1180, height: 820), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1)
     static let tabletPortrait = Device(size: CGSize(width: 820, height: 1180), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1)
     static let screen = Device(size: CGSize(width: 1280, height: 720), scale: 1)
+    /// 1320 x 2868, the 6.9 inch iPhone.
+    static let storePhone = Device(size: CGSize(width: 440, height: 956), safeArea: EdgeInsets(top: 62, leading: 0, bottom: 34, trailing: 0), scale: 3)
+    /// 2752 x 2064, the 13 inch iPad on its side.
+    static let storeTablet = Device(size: CGSize(width: 1376, height: 1032), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 2)
 }
 
 private let folder = URL(fileURLWithPath: #filePath)
@@ -355,9 +467,68 @@ private func shoot(_ name: String, _ device: Device, _ view: some View) async th
     let image = picture(of: canvas, device)
     strike(window)
 
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let file = folder.appendingPathComponent(name + ".png")
+    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
     let png = try #require(image.pngData())
-    try png.write(to: folder.appendingPathComponent(name + ".png"))
+    try png.write(to: file)
+}
+
+/// What the system draws over an app and a window in a test does not have: the status bar at
+/// 9:41 and the home indicator.
+private struct StoreChrome<Content: View>: View {
+    var tablet: Bool
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        content
+            // Each fills the whole window before it leaves the safe area, so that it is put
+            // at the window's edge and not in the middle of what it was given.
+            .overlay {
+                statusBar
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .ignoresSafeArea()
+            }
+            .overlay {
+                Capsule()
+                    .fill(.white.opacity(0.9))
+                    .frame(width: tablet ? 320 : 148, height: tablet ? 6 : 5)
+                    .padding(.bottom, 8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .ignoresSafeArea()
+            }
+            .allowsHitTesting(true)
+    }
+
+    @ViewBuilder private var statusBar: some View {
+        if tablet {
+            HStack(spacing: 6) {
+                Text("9:41")
+                Text("Tue Sep 9")
+                Spacer()
+                Image(systemName: "wifi")
+                Text("100%")
+                Image(systemName: "battery.100percent").font(.system(size: 17, weight: .regular))
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 22)
+            .frame(height: 24)
+        } else {
+            HStack(spacing: 6) {
+                Text("9:41").font(.system(size: 17, weight: .semibold))
+                Spacer()
+                Image(systemName: "cellularbars")
+                Image(systemName: "wifi")
+                Image(systemName: "battery.100percent").font(.system(size: 20, weight: .regular))
+            }
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.leading, 56)
+            .padding(.trailing, 40)
+            .frame(height: 24)
+            .padding(.top, 21)
+        }
+    }
 }
 
 /// How much slower than life a film is taken. A frame takes the simulator in CI about an eighth

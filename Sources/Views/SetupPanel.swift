@@ -110,7 +110,7 @@ private struct SetupCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title).sectionLabel().padding(.horizontal, 4)
             VStack(spacing: 0) { content }
-                .background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(fill, in: RoundedRectangle(cornerRadius: Theme.groupRadius, style: .continuous))
             if let footer {
                 Text(footer)
                     .font(.footnote)
@@ -150,7 +150,7 @@ private struct RowDivider: View {
         Rectangle()
             .fill(Theme.hairline)
             .frame(height: 1)
-            .padding(.leading, 14)
+            .padding(.leading, 16)
     }
 }
 
@@ -158,7 +158,7 @@ private extension View {
     func setupRow() -> some View {
         font(.body)
             .foregroundStyle(Theme.text)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .frame(minHeight: 52)
     }
 }
@@ -193,18 +193,18 @@ private struct ConnectionCard: View {
                 if kinds.contains(.window) {
                     Button("Close the display window") { DisplaySceneDelegate.closeWindows() }
                         .font(.subheadline.weight(.semibold))
-                        .buttonStyle(KeyStyle(fill: keyFill, radius: 12))
+                        .buttonStyle(KeyStyle.flat(keyFill))
                         .frame(height: 44)
                 } else if multipleScenes {
                     Button("Open a display window") { DisplaySceneDelegate.open() }
                         .font(.subheadline.weight(.semibold))
-                        .buttonStyle(KeyStyle(fill: keyFill, radius: 12))
+                        .buttonStyle(KeyStyle.flat(keyFill))
                         .frame(height: 44)
                 }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(fill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(fill, in: RoundedRectangle(cornerRadius: Theme.groupRadius, style: .continuous))
             .animation(Motion.state, value: kinds)
         }
     }
@@ -261,7 +261,7 @@ struct DurationPicker: View {
             }
         }
         .presentationDetents([.medium])
-        .presentationBackground(Theme.surface)
+        .sheetGround()
         .tint(Theme.amber)
         .preferredColorScheme(.dark)
         .onAppear {

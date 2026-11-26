@@ -17,7 +17,6 @@ struct Transport: View {
     @State private var ticker: Task<Void, Never>?
 
     private static let holdTime = 0.7
-    private static let radius: CGFloat = 18
 
     /// `holding` draws the row as it is partway through a hold on Reset. Only a screenshot asks
     /// for it: nothing but a finger can hold the key.
@@ -37,7 +36,7 @@ struct Transport: View {
                 }
                 .font(.title2.weight(.bold))
             }
-            .buttonStyle(model.isRunning ? KeyStyle(fill: Theme.raised, radius: Self.radius) : KeyStyle.primary(radius: Self.radius))
+            .buttonStyle(model.isRunning ? KeyStyle(fill: Theme.raised) : KeyStyle.primary())
             .animation(Motion.state, value: model.isRunning)
             .overlay { holdFeedback }
             .keyboardShortcut(.space, modifiers: [])
@@ -66,8 +65,7 @@ struct Transport: View {
 
     /// Covers the Start key while Reset is held: red sweeps in from the Reset side.
     private var holdFeedback: some View {
-        let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
-        return GeometryReader { geo in
+        GeometryReader { geo in
             ZStack(alignment: .trailing) {
                 Theme.surface
                 Theme.hold.frame(width: geo.size.width * fill)
@@ -81,15 +79,14 @@ struct Transport: View {
                     .padding(.horizontal, 8)
             }
         }
-        .clipShape(shape)
+        .clipShape(Capsule())
         .opacity(holding ? 1 : 0)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 
     private var resetKey: some View {
-        let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
-        return VStack(spacing: 2) {
+        VStack(spacing: 2) {
             Label("Reset", systemImage: "arrow.counterclockwise")
                 .font(.body.weight(.semibold))
             Text("hold")
@@ -97,11 +94,12 @@ struct Transport: View {
                 .foregroundStyle(holding ? Color.white : Theme.secondary)
         }
         .foregroundStyle(holding ? Color.white : Theme.text)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(holding ? Theme.hold : Theme.raised, in: shape)
-        .scaleEffect(holding && !reduceMotion ? 0.95 : 1)
+        // The words dim when there is nothing to reset; the key itself stays where it is.
         .opacity(model.isPristine ? 0.4 : 1)
-        .contentShape(shape)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .keyGlass(lit: holding ? Theme.hold : nil, fallback: Theme.raised)
+        .scaleEffect(holding && !reduceMotion ? 0.95 : 1)
+        .contentShape(Capsule())
         .onLongPressGesture(minimumDuration: Self.holdTime, maximumDistance: 80) {
             model.reset()
             resets += 1
