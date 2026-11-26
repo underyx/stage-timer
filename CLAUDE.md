@@ -96,10 +96,12 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
 - **The display's digits never animate their own place or size; only their colour fades.** They are
   a mask over the colour, with the animation taken off them, because any animation that reached
   the text when it changed (the colour fade did) made the new time slide in at an angle.
-- **What a `TimelineView` tick changes does not animate through `.animation(_:value:)`.** The
-  display's colour cut from white to amber at 1:00 while the same change made on the model faded.
-  `DisplayView` keeps the phase it draws as state and starts the fade with `withAnimation` from
-  `onChange`; do the same for anything else that should move when the clock gets somewhere.
+- **The display's change of colour is not left to `.animation(_:value:)`.** It arrives on a tick
+  of the `TimelineView`, and with the modifier white to amber at 1:00 faded in one filmed run and
+  cut in the next (cause not found; it may be the filming). `DisplayView` keeps the phase it draws
+  as state and starts the fade with `withAnimation` from `onChange`. Amber to red at zero is no
+  animation at all but a blend by the time past zero: an animation under the overtime pulse,
+  which changes the colour every tick, sent the digits through cyan and green.
 - **A control must not change size when its state does.** The Black out key has one title and
   lays out both of its icons: when it grew to say "Blacked out", its amber fill arrived outside
   the margin, and a key held at that width left no room for the line beside it.

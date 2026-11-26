@@ -22,11 +22,13 @@ private struct Face: View {
     @Environment(TimerModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let now: Date
-    /// The phase the colours are drawn for: the timer's own, a fade behind. Most changes of
-    /// phase arrive on a tick of the `TimelineView`, and what a tick changes does not animate
-    /// through `.animation(_:value:)` (white cut to amber at 1:00). So the phase drawn is state,
-    /// and the fade is started by hand when the timer's moves on.
+    /// The phase the colours are drawn for: the timer's own, a fade behind. The fade is
+    /// started by hand when the timer's phase moves on, not left to `.animation(_:value:)`:
+    /// most changes of phase arrive on a tick of the `TimelineView`, and left to the modifier
+    /// white to amber at 1:00 faded in one filmed run and cut in the next.
     @State private var shown: TimerModel.Phase?
+    /// The phase before this one, which running out fades from.
+    @State private var before = TimerModel.Phase.normal
 
     var body: some View {
         let snapshot = model.snapshot(at: now)
@@ -43,13 +45,18 @@ private struct Face: View {
             // Blacking out dims like house lights rather than cutting.
             .animation(Motion.paced(.easeInOut(duration: 0.35)), value: model.blackout)
         }
-        .onChange(of: snapshot.phase, initial: true) { _, phase in
-            if shown == nil {
+        .onChange(of: snapshot.phase, initial: true) { old, phase in
+            if shown == nil || phase == .overtime {
+                // Running out is not an animation: `tint` works the red in from the time
+                // past zero. For its first seconds the colour also pulses towards white, and
+                // an animation under a colour that changes every tick sent the digits through
+                // cyan and green on the way.
+                before = shown == nil ? phase : old
                 shown = phase
             } else {
                 // Nothing but the colour differs between the two phases at one moment, so
                 // nothing but the colour moves; the digits take no animation in any case.
-                withAnimation(Motion.paced(.easeInOut(duration: 0.6))) { shown = phase }
+                withAnimation(Motion.paced(.easeInOut(duration: Self.fade))) { shown = phase }
             }
         }
     }
@@ -57,7 +64,7 @@ private struct Face: View {
     private func content(_ snapshot: TimerModel.Snapshot, flash: Double, unit: CGFloat, width: CGFloat) -> some View {
         let message = model.showMessage ? model.message.trimmingCharacters(in: .whitespacesAndNewlines) : ""
         let sharing = !message.isEmpty
-        let color = Self.color(shown ?? snapshot.phase, flash: flash)
+        let color = tint(snapshot, flash: flash)
         let full = digitSize(snapshot.text, unit: unit, width: width, sharing: false)
         let shared = digitSize(snapshot.text, unit: unit, width: width, sharing: true)
         return VStack(spacing: 0) {
@@ -151,12 +158,28 @@ private struct Face: View {
         return (1 - cos(over * 2 * .pi)) / 2
     }
 
-    private static func color(_ phase: TimerModel.Phase, flash: Double) -> Color {
+    /// How long white takes to become amber, and amber red.
+    private static let fade = 0.6
+
+    private func tint(_ snapshot: TimerModel.Snapshot, flash: Double) -> Color {
+        switch shown ?? snapshot.phase {
+        case .normal: Theme.text
+        case .warning: Theme.warning
+        case .overtime:
+            // From the colour it had, over the first moments past zero. On the flash the
+            // digits go white: red on red is the one moment nobody can read.
+            Self.rest(before)
+                .blended(with: Theme.overtime, by: (snapshot.overtime ?? Self.fade) / Self.fade)
+                .blended(with: .white, by: flash)
+        }
+    }
+
+    /// The colour of a phase when nothing is pulsing.
+    private static func rest(_ phase: TimerModel.Phase) -> Color {
         switch phase {
         case .normal: Theme.text
         case .warning: Theme.warning
-        // On the flash the digits go white: red on red is the one moment nobody can read.
-        case .overtime: Theme.overtime.blended(with: .white, by: flash)
+        case .overtime: Theme.overtime
         }
     }
 }
