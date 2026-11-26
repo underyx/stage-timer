@@ -9,7 +9,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "1.2"
-    CURRENT_PROJECT_VERSION: "9"
+    CURRENT_PROJECT_VERSION: "10"
     # PostHog project API key, shared with Line Bites (events carry app=stage-timer).
     # Empty disables analytics entirely.
     POSTHOG_API_KEY: phc_vUgTnULQdUWDrzsoDfGrBoUz59RY3Z3bSQqvdJukkPt4
