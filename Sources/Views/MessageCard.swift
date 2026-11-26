@@ -22,7 +22,9 @@ struct MessageCard: View {
                 Spacer()
                 if live {
                     OnScreenTally(pulsing: !reduceMotion)
-                        .transition(AnyTransition.opacity.combined(with: .move(edge: .trailing)))
+                        // Not `.move`: that starts a whole width to the right, which is
+                        // past the card's edge and the screen's.
+                        .transition(AnyTransition.opacity.combined(with: .scale(scale: 0.85, anchor: .trailing)))
                 }
             }
             .frame(height: 16)
@@ -73,7 +75,7 @@ struct MessageCard: View {
                 .stroke(Theme.amber, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                 .opacity(live ? 1 : 0)
         }
-        .animation(reduceMotion ? Motion.fade : .easeInOut(duration: 0.5), value: live)
+        .animation(reduceMotion ? Motion.fade : Motion.paced(.easeInOut(duration: 0.5)), value: live)
         .sensoryFeedback(trigger: live) { _, live in
             .impact(weight: live ? .medium : .light)
         }

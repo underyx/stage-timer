@@ -22,6 +22,13 @@ private struct Face: View {
     @Environment(TimerModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let now: Date
+    /// The phase the colours are drawn for: the timer's own, a fade behind. The fade is
+    /// started by hand when the timer's phase moves on, not left to `.animation(_:value:)`:
+    /// most changes of phase arrive on a tick of the `TimelineView`, and left to the modifier
+    /// white to amber at 1:00 faded in one filmed run and cut in the next.
+    @State private var shown: TimerModel.Phase?
+    /// The phase before this one, which running out fades from.
+    @State private var before = TimerModel.Phase.normal
 
     var body: some View {
         let snapshot = model.snapshot(at: now)
@@ -36,14 +43,28 @@ private struct Face: View {
                     .opacity(model.blackout ? 0 : 1)
             }
             // Blacking out dims like house lights rather than cutting.
-            .animation(.easeInOut(duration: 0.35), value: model.blackout)
+            .animation(Motion.paced(.easeInOut(duration: 0.35)), value: model.blackout)
+        }
+        .onChange(of: snapshot.phase, initial: true) { old, phase in
+            if shown == nil || phase == .overtime {
+                // Running out is not an animation: `tint` works the red in from the time
+                // past zero. For its first seconds the colour also pulses towards white, and
+                // an animation under a colour that changes every tick sent the digits through
+                // cyan and green on the way.
+                before = shown == nil ? phase : old
+                shown = phase
+            } else {
+                // Nothing but the colour differs between the two phases at one moment, so
+                // nothing but the colour moves; the digits take no animation in any case.
+                withAnimation(Motion.paced(.easeInOut(duration: Self.fade))) { shown = phase }
+            }
         }
     }
 
     private func content(_ snapshot: TimerModel.Snapshot, flash: Double, unit: CGFloat, width: CGFloat) -> some View {
         let message = model.showMessage ? model.message.trimmingCharacters(in: .whitespacesAndNewlines) : ""
         let sharing = !message.isEmpty
-        let color = Self.color(snapshot.phase, flash: flash)
+        let color = tint(snapshot, flash: flash)
         let full = digitSize(snapshot.text, unit: unit, width: width, sharing: false)
         let shared = digitSize(snapshot.text, unit: unit, width: width, sharing: true)
         return VStack(spacing: 0) {
@@ -51,19 +72,31 @@ private struct Face: View {
             // set again smaller: scaling animates, a font size does not.
             Color.clear
                 .overlay {
-                    Text(snapshot.text)
-                        .font(.system(size: full, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(color)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.3)
-                        .contentTransition(.identity)
+                    // The colour and the digits are two layers, the digits cut out of the colour,
+                    // because they change differently. White to amber to red is a change of
+                    // state and fades. A new time is a cut: 1:00 becoming 10:00 is narrower type
+                    // in another place, and a number that travels there (it did, at an angle,
+                    // whenever the colour changed in the same moment) is a number nobody can read.
+                    color
+                        .mask {
+                            Text(snapshot.text)
+                                .font(.system(size: full, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.3)
+                                .contentTransition(.identity)
+                                .transaction { $0.animation = nil }
+                        }
                         // Tall enough for the line at full size, so only a time too wide for the
                         // estimate in `ems` is ever shrunk by the text itself.
                         .frame(width: max(width - unit * 0.10, 1), height: unit * 0.8)
+                        // The block still glides up as one when a message takes the bottom of the
+                        // screen; without this the digits inside it would jump there instead.
+                        .geometryGroup()
                         .scaleEffect(sharing ? shared / full : 1)
-                        // White to amber to red is a change of state, not a cut.
-                        .animation(.easeInOut(duration: 0.6), value: snapshot.phase)
+                        .accessibilityElement()
+                        .accessibilityLabel(snapshot.text)
+                        .accessibilityAddTraits(.updatesFrequently)
                 }
 
             if sharing {
@@ -83,10 +116,11 @@ private struct Face: View {
             }
 
             if let progress = snapshot.progress {
+                // The same colour as the digits, so the bar turns with them.
                 ProgressBar(progress: progress, color: color, height: max(unit * 0.018, 3))
             }
         }
-        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.12), value: sharing)
+        .animation(Motion.paced(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.12)), value: sharing)
         .overlay(alignment: .topTrailing) {
             if model.showClock {
                 Text(now, format: .dateTime.hour().minute())
@@ -124,12 +158,28 @@ private struct Face: View {
         return (1 - cos(over * 2 * .pi)) / 2
     }
 
-    private static func color(_ phase: TimerModel.Phase, flash: Double) -> Color {
+    /// How long white takes to become amber, and amber red.
+    private static let fade = 0.6
+
+    private func tint(_ snapshot: TimerModel.Snapshot, flash: Double) -> Color {
+        switch shown ?? snapshot.phase {
+        case .normal: Theme.text
+        case .warning: Theme.warning
+        case .overtime:
+            // From the colour it had, over the first moments past zero. On the flash the
+            // digits go white: red on red is the one moment nobody can read.
+            Self.rest(before)
+                .blended(with: Theme.overtime, by: (snapshot.overtime ?? Self.fade) / Self.fade)
+                .blended(with: .white, by: flash)
+        }
+    }
+
+    /// The colour of a phase when nothing is pulsing.
+    private static func rest(_ phase: TimerModel.Phase) -> Color {
         switch phase {
         case .normal: Theme.text
         case .warning: Theme.warning
-        // On the flash the digits go white: red on red is the one moment nobody can read.
-        case .overtime: Theme.overtime.blended(with: .white, by: flash)
+        case .overtime: Theme.overtime
         }
     }
 }

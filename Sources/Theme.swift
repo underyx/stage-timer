@@ -40,13 +40,24 @@ enum Theme {
 /// The few curves everything moves on. Quick and slightly sprung: the surface should feel like
 /// hardware answering, never like a screen performing.
 enum Motion {
+    /// How many times slower than life everything here moves. Always 1 in the app. The tests
+    /// that film a change raise it: a simulator in CI draws a frame in about an eighth of a
+    /// second, and a glide of a third of a second would be over in two of them. Unsafe by the
+    /// compiler's lights only: nothing but a test writes it, from the main thread.
+    nonisolated(unsafe) static var slowdown: Double = 1
+
     /// A key going down and coming back.
-    static let press = Animation.spring(duration: 0.22, bounce: 0.3)
+    static var press: Animation { paced(.spring(duration: 0.22, bounce: 0.3)) }
     /// A selection travelling from one place to another.
-    static let glide = Animation.spring(duration: 0.35, bounce: 0.2)
+    static var glide: Animation { paced(.spring(duration: 0.35, bounce: 0.2)) }
     /// Something changing what it is: Start becoming Pause, a card going live.
-    static let state = Animation.spring(duration: 0.42, bounce: 0.16)
-    static let fade = Animation.easeInOut(duration: 0.3)
+    static var state: Animation { paced(.spring(duration: 0.42, bounce: 0.16)) }
+    static var fade: Animation { paced(.easeInOut(duration: 0.3)) }
+
+    /// Any other curve, at the pace the rest is moving at.
+    static func paced(_ animation: Animation) -> Animation {
+        slowdown == 1 ? animation : animation.speed(1 / slowdown)
+    }
 }
 
 /// A key: fills whatever frame it is given, so rows of keys are sized by their row.
@@ -109,12 +120,14 @@ struct ChipStyle: ButtonStyle {
             .background {
                 ZStack {
                     shape.fill(fill)
-                    if selected {
-                        if let selection {
+                    if let selection {
+                        if selected {
                             shape.fill(Theme.amber).matchedGeometryEffect(id: "selected", in: selection)
-                        } else {
-                            shape.fill(Theme.amber).transition(AnyTransition.opacity)
                         }
+                    } else {
+                        // Always there and faded, not put in and taken out: taken out, it went
+                        // at once, and the label was dark on dark until its own fade was done.
+                        shape.fill(Theme.amber).opacity(selected ? 1 : 0)
                     }
                 }
             }

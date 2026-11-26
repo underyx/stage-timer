@@ -67,7 +67,7 @@ private struct Monitor: View {
                     .phaseAnimator([0.0, 1.0], trigger: starts) { border, glow in
                         border.opacity(glow)
                     } animation: { glow in
-                        glow == 1 ? .easeOut(duration: 0.1) : .easeOut(duration: 0.8)
+                        Motion.paced(glow == 1 ? .easeOut(duration: 0.1) : .easeOut(duration: 0.8))
                     }
             }
             .overlay(alignment: .topLeading) { badge.padding(10) }
@@ -220,7 +220,7 @@ struct ConnectionDot: View {
                     .phaseAnimator([0, 1, 2], trigger: connected) { ring, step in
                         ring.scaleEffect(step == 2 ? 3 : 1).opacity(step == 1 ? 0.8 : 0)
                     } animation: { step in
-                        step == 2 ? .easeOut(duration: 0.9) : .linear(duration: 0.01)
+                        step == 2 ? Motion.paced(.easeOut(duration: 0.9)) : .linear(duration: 0.01)
                     }
             }
         }
@@ -353,15 +353,22 @@ private struct BlackoutButton: View {
 
     var body: some View {
         Button { model.blackout.toggle() } label: {
+            // One title, and both icons laid out with one of them shown, so the key is exactly
+            // as wide lit as not. When it grew to say "Blacked out" its amber arrived outside
+            // the margin, and the line beside it lost the room for "over since 12:16 AM". The
+            // monitor above says what state the screen is in.
             Label {
-                Text(model.blackout ? "Blacked out" : "Black out")
+                Text("Black out")
             } icon: {
-                Image(systemName: model.blackout ? "eye.slash.fill" : "eye.slash")
-                    .contentTransition(.symbolEffect(.replace))
+                ZStack {
+                    Image(systemName: "eye.slash").opacity(model.blackout ? 0 : 1)
+                    Image(systemName: "eye.slash.fill").opacity(model.blackout ? 1 : 0)
+                }
             }
+            .fontWeight(.semibold)
         }
         .buttonStyle(ChipStyle(selected: model.blackout, radius: 22))
-        .animation(Motion.state, value: model.blackout)
+        .animation(Motion.fade, value: model.blackout)
         .keyboardShortcut("b", modifiers: [])
         .sensoryFeedback(.selection, trigger: model.blackout)
         .accessibilityAddTraits(model.blackout ? .isSelected : [])
@@ -376,6 +383,8 @@ private struct LengthRow: View {
     @Environment(TimerModel.self) private var model
     @Binding var sheet: ControlSheet?
     @State private var pending: TimeInterval?
+    /// Counts the lengths chosen here, for the click that answers a pick.
+    @State private var picks = 0
     // One per arrangement: only one is ever on screen, but both are measured.
     @Namespace private var spread
     @Namespace private var strip
@@ -400,16 +409,19 @@ private struct LengthRow: View {
                         .onAppear {
                             // The first lengths are in view as it is; one further along is
                             // brought to the middle.
-                            if isCustom {
-                                proxy.scrollTo(Self.customID, anchor: .trailing)
-                            } else if model.duration > 10 * 60 {
+                            if !isCustom && model.duration > 10 * 60 {
                                 proxy.scrollTo(model.duration, anchor: .center)
                             }
                         }
                     }
                 }
+                // The amber glides from one length in the row to another. A length that is not
+                // in the row lights nothing: the key at the far end used to light for it, so
+                // stepping the time threw the highlight to that end and back at every length
+                // it passed. Passing one with the nudge keys lights it without a glide either
+                // (`TimerModel.step`).
                 .animation(Motion.glide, value: model.duration)
-                .sensoryFeedback(.selection, trigger: model.duration)
+                .sensoryFeedback(.selection, trigger: picks)
             case .stopwatch:
                 Button { sheet = .elapsed } label: {
                     Label("Add time already spent…", systemImage: "clock.arrow.circlepath")
@@ -427,7 +439,7 @@ private struct LengthRow: View {
             presenting: pending
         ) { seconds in
             Button("Reset to \(TimerModel.format(Int(seconds)))", role: .destructive) {
-                model.setDuration(seconds)
+                choose(seconds)
             }
             Button("Keep going", role: .cancel) {}
         } message: { _ in
@@ -454,24 +466,27 @@ private struct LengthRow: View {
                     .accessibilityLabel(minutes == 1 ? "1 minute" : "\(minutes) minutes")
                     .accessibilityAddTraits(model.duration == seconds ? .isSelected : [])
             }
+            // Always the pencil, never lit: the line above the row says what the length is.
             Button { sheet = .length } label: {
-                if isCustom {
-                    Text(TimerModel.format(Int(model.duration))).monospacedDigit()
-                } else {
-                    Image(systemName: "pencil")
-                }
+                Image(systemName: "pencil")
             }
-            .buttonStyle(ChipStyle(selected: isCustom, flexible: flexible, padding: 8, selection: flexible ? spread : strip))
+            .buttonStyle(ChipStyle(flexible: flexible, padding: 8))
             .id(Self.customID)
             .accessibilityLabel("Custom length")
+            .accessibilityValue(isCustom ? TimerModel.format(Int(model.duration)) : "")
         }
     }
 
     private func pick(_ seconds: TimeInterval) {
-        if model.isPristine {
-            model.setDuration(seconds)
-        } else {
+        if !model.isPristine {
             pending = seconds
+        } else if seconds != model.duration {
+            choose(seconds)
         }
+    }
+
+    private func choose(_ seconds: TimeInterval) {
+        picks += 1
+        model.setDuration(seconds)
     }
 }
