@@ -159,7 +159,7 @@ struct ScreenshotTests {
         try await film("length-5m-to-3m", .phone, ControlView().environment(near)) { near.setDuration(3 * 60) }
         let far = timer()
         try await film("ipad-length-5m-to-20m", .tabletLandscape, ControlView().environment(far)) { far.setDuration(20 * 60) }
-        // From a custom length the amber does not travel: its key is off the end of a phone's strip.
+        // A custom length lights nothing in the row, so there is nowhere for the amber to come from.
         let custom = timer(length: 7 * 60 + 30)
         try await film("ipad-length-custom-to-3m", .tabletLandscape, ControlView().environment(custom)) { custom.setDuration(3 * 60) }
     }
@@ -204,15 +204,16 @@ struct ScreenshotTests {
         try await film("reset", .phone, ControlView().environment(model)) { model.reset() }
     }
 
-    /// The two moments the display changes colour by itself. Each is about half a second into
-    /// its film: a view takes most of a second to be put up before filming starts.
+    /// The two moments the display changes colour by itself. Nothing is changed by the film:
+    /// the clock gets there, a second or two in. A view takes between one second and three to
+    /// be put up before filming starts, so each timer is started well short of its moment.
     @Test func runningOut() async throws {
-        let amber = timer(elapsed: 4 * 60 - 1.5)
-        try await film("into-the-last-minute", .phone, ControlView().environment(amber), for: .seconds(4)) {}
-        let red = timer(elapsed: 5 * 60 - 1.5)
-        try await film("into-overtime", .phone, ControlView().environment(red), for: .seconds(4)) {}
-        let room = timer(elapsed: 5 * 60 - 1.5)
-        try await film("screen-into-overtime", .screen, DisplayView().environment(room), for: .seconds(4)) {}
+        let amber = timer(elapsed: 4 * 60 - 3.5)
+        try await film("into-the-last-minute", .phone, ControlView().environment(amber), for: .seconds(6)) {}
+        let red = timer(elapsed: 5 * 60 - 3.5)
+        try await film("into-overtime", .phone, ControlView().environment(red), for: .seconds(6)) {}
+        let room = timer(elapsed: 5 * 60 - 3.5)
+        try await film("screen-into-overtime", .screen, DisplayView().environment(room), for: .seconds(6)) {}
         // 10:00 is one digit wider than the 9:59 that follows it a second after the start.
         let tens = timer(length: 10 * 60)
         try await film("screen-ten-minutes-to-nine", .screen, DisplayView().environment(tens), for: .seconds(2)) { tens.start() }

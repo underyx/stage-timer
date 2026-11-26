@@ -96,12 +96,18 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
 - **The display's digits never animate their own place or size; only their colour fades.** They are
   a mask over the colour, with the animation taken off them, because any animation that reached
   the text when it changed (the colour fade did) made the new time slide in at an angle.
+- **What a `TimelineView` tick changes does not animate through `.animation(_:value:)`.** The
+  display's colour cut from white to amber at 1:00 while the same change made on the model faded.
+  `DisplayView` keeps the phase it draws as state and starts the fade with `withAnimation` from
+  `onChange`; do the same for anything else that should move when the clock gets somewhere.
 - **A control must not change size when its state does.** The Black out key has one title and
   lays out both of its icons: when it grew to say "Blacked out", its amber fill arrived outside
   the margin, and a key held at that width left no room for the line beside it.
 - **The nudge keys go through `TimerModel.step`**, which disables animations for the change. They
   repeat while held and, before a start, walk the length across the row of lengths: anything that
-  animates on the length would be restarted several times a second.
+  animates on the length would be restarted several times a second. For the same reason a length
+  that is not in the row lights nothing there: the key at the far end used to light for it, and
+  stepping threw the highlight to that end and back.
 - **Saved state decodes all or nothing** (`SavedState`, one JSON value in UserDefaults under
   `state`). A new field in `SavedState` or `TimerState` must be optional, or the update that adds
   it silently resets every user's settings. `TimerState.Mode` raw values are stored and sent to

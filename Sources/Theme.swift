@@ -120,12 +120,14 @@ struct ChipStyle: ButtonStyle {
             .background {
                 ZStack {
                     shape.fill(fill)
-                    if selected {
-                        if let selection {
+                    if let selection {
+                        if selected {
                             shape.fill(Theme.amber).matchedGeometryEffect(id: "selected", in: selection)
-                        } else {
-                            shape.fill(Theme.amber).transition(AnyTransition.opacity)
                         }
+                    } else {
+                        // Always there and faded, not put in and taken out: taken out, it went
+                        // at once, and the label was dark on dark until its own fade was done.
+                        shape.fill(Theme.amber).opacity(selected ? 1 : 0)
                     }
                 }
             }

@@ -201,9 +201,9 @@ extension TimerModel {
     /// shifted for a stopwatch.
     ///
     /// Nothing animates for it. The keys repeat while held, and before a start they edit the
-    /// length itself, which passes over the lengths in the row: every animation that follows the
-    /// length (the highlight gliding, the colour fading as a step crosses into the last minute)
-    /// would be started and cut off several times a second.
+    /// length itself, which passes over the lengths in the row: an animation that follows the
+    /// length (the highlight gliding to a length and away again) would be started and cut off
+    /// several times a second.
     func step(by seconds: TimeInterval) {
         var still = Transaction()
         still.disablesAnimations = true

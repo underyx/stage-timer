@@ -22,6 +22,11 @@ private struct Face: View {
     @Environment(TimerModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let now: Date
+    /// The phase the colours are drawn for: the timer's own, a fade behind. Most changes of
+    /// phase arrive on a tick of the `TimelineView`, and what a tick changes does not animate
+    /// through `.animation(_:value:)` (white cut to amber at 1:00). So the phase drawn is state,
+    /// and the fade is started by hand when the timer's moves on.
+    @State private var shown: TimerModel.Phase?
 
     var body: some View {
         let snapshot = model.snapshot(at: now)
@@ -38,12 +43,21 @@ private struct Face: View {
             // Blacking out dims like house lights rather than cutting.
             .animation(Motion.paced(.easeInOut(duration: 0.35)), value: model.blackout)
         }
+        .onChange(of: snapshot.phase, initial: true) { _, phase in
+            if shown == nil {
+                shown = phase
+            } else {
+                // Nothing but the colour differs between the two phases at one moment, so
+                // nothing but the colour moves; the digits take no animation in any case.
+                withAnimation(Motion.paced(.easeInOut(duration: 0.6))) { shown = phase }
+            }
+        }
     }
 
     private func content(_ snapshot: TimerModel.Snapshot, flash: Double, unit: CGFloat, width: CGFloat) -> some View {
         let message = model.showMessage ? model.message.trimmingCharacters(in: .whitespacesAndNewlines) : ""
         let sharing = !message.isEmpty
-        let color = Self.color(snapshot.phase, flash: flash)
+        let color = Self.color(shown ?? snapshot.phase, flash: flash)
         let full = digitSize(snapshot.text, unit: unit, width: width, sharing: false)
         let shared = digitSize(snapshot.text, unit: unit, width: width, sharing: true)
         return VStack(spacing: 0) {
@@ -57,7 +71,6 @@ private struct Face: View {
                     // in another place, and a number that travels there (it did, at an angle,
                     // whenever the colour changed in the same moment) is a number nobody can read.
                     color
-                        .animation(Motion.paced(.easeInOut(duration: 0.6)), value: snapshot.phase)
                         .mask {
                             Text(snapshot.text)
                                 .font(.system(size: full, weight: .bold, design: .rounded))
@@ -96,9 +109,8 @@ private struct Face: View {
             }
 
             if let progress = snapshot.progress {
+                // The same colour as the digits, so the bar turns with them.
                 ProgressBar(progress: progress, color: color, height: max(unit * 0.018, 3))
-                    // The bar turns with the digits, not ahead of them.
-                    .animation(Motion.paced(.easeInOut(duration: 0.6)), value: snapshot.phase)
             }
         }
         .animation(Motion.paced(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.12)), value: sharing)

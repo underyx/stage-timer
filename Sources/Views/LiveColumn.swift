@@ -385,8 +385,6 @@ private struct LengthRow: View {
     @State private var pending: TimeInterval?
     /// Counts the lengths chosen here, for the click that answers a pick.
     @State private var picks = 0
-    /// Whether the length before this one was a custom one.
-    @State private var wasCustom = false
     // One per arrangement: only one is ever on screen, but both are measured.
     @Namespace private var spread
     @Namespace private var strip
@@ -411,20 +409,18 @@ private struct LengthRow: View {
                         .onAppear {
                             // The first lengths are in view as it is; one further along is
                             // brought to the middle.
-                            if isCustom {
-                                proxy.scrollTo(Self.customID, anchor: .trailing)
-                            } else if model.duration > 10 * 60 {
+                            if !isCustom && model.duration > 10 * 60 {
                                 proxy.scrollTo(model.duration, anchor: .center)
                             }
                         }
                     }
                 }
-                // The amber glides between the lengths in the row, but neither to nor from the
-                // custom key, which on a phone is somewhere off the end of the strip. A length
-                // reached with the nudge keys does not glide either: `TimerModel.step` sees to
-                // that, or the highlight would fly to the far end and back every few steps.
-                .animation(isCustom || wasCustom ? nil : Motion.glide, value: model.duration)
-                .onChange(of: isCustom, initial: true) { _, custom in wasCustom = custom }
+                // The amber glides from one length in the row to another. A length that is not
+                // in the row lights nothing: the key at the far end used to light for it, so
+                // stepping the time threw the highlight to that end and back at every length
+                // it passed. Passing one with the nudge keys lights it without a glide either
+                // (`TimerModel.step`).
+                .animation(Motion.glide, value: model.duration)
                 .sensoryFeedback(.selection, trigger: picks)
             case .stopwatch:
                 Button { sheet = .elapsed } label: {
@@ -470,16 +466,14 @@ private struct LengthRow: View {
                     .accessibilityLabel(minutes == 1 ? "1 minute" : "\(minutes) minutes")
                     .accessibilityAddTraits(model.duration == seconds ? .isSelected : [])
             }
+            // Always the pencil, never lit: the line above the row says what the length is.
             Button { sheet = .length } label: {
-                if isCustom {
-                    Text(TimerModel.format(Int(model.duration))).monospacedDigit()
-                } else {
-                    Image(systemName: "pencil")
-                }
+                Image(systemName: "pencil")
             }
-            .buttonStyle(ChipStyle(selected: isCustom, flexible: flexible, padding: 8, selection: flexible ? spread : strip))
+            .buttonStyle(ChipStyle(flexible: flexible, padding: 8))
             .id(Self.customID)
             .accessibilityLabel("Custom length")
+            .accessibilityValue(isCustom ? TimerModel.format(Int(model.duration)) : "")
         }
     }
 
