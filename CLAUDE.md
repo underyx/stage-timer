@@ -65,9 +65,12 @@ the system animates at its own pace, and haptics.
 **Liquid Glass is only drawn truly on the simulator's own screen.** It is made from what is behind
 it there; past the screen's edge it is given the edge's last column of pixels, and a key showed a
 band of the key beside it. The views drawn are larger than a phone's screen, so `picture` moves a
-view across the screen and keeps a screenful from each drawing, and a film is of one screenful
-(`part`, the top left one unless the film says otherwise). A device with `glass` off is drawn in one
-go, as the display is.
+view across the screen, waits (glass that has just come onto the screen is not drawn yet: a key was
+dark), and keeps a screenful from each drawing. A film is of one screenful (`part`, the top left one
+unless the film says otherwise), so no frame waits for a move. A size whose monitor would be in two
+pieces, which take long enough apart for the time to change between them, is drawn whole once and
+only its keys again in pieces: `Device.keys` says where they are, and a key moved out of those
+rectangles is drawn wrongly. A device with `glass` off is drawn in one go, as the display is.
 
 CI cannot see a real external display, AirPlay, Stage Manager or the lock button. A change to the
 scene code or `LockKeepalive` is unverified until someone runs it on hardware, whatever CI says.
@@ -116,8 +119,8 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   which changes the colour every tick, sent the digits through cyan and green.
 - **Words that change on a key go through `KeyTitle`, and a key's ink through `Motion.ink`.** Two
   titles cross-fading in one place were neither for a third of the change, and ink fading along
-  with a body that turns amber is dark on dark halfway. The old word leaves first; the ink flips
-  in a moment, mid-change.
+  with a body that turns amber is grey on brown halfway. The old word leaves first; the ink
+  changes at a stroke, mid-change.
 - **A control must not change size when its state does.** The Black out key has one title and
   lays out both of its icons: when it grew to say "Blacked out", its amber fill arrived outside
   the margin, and a key held at that width left no room for the line beside it.

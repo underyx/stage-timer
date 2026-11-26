@@ -125,7 +125,7 @@ struct ScreenshotTests {
         }
         try await shoot("flat-phone-running", .phone, ControlView().environment(model))
         try await shoot("flat-phone-ready", .phone, ControlView().environment(timer()))
-        try await shoot("flat-ipad-landscape-running", .tabletLandscape, ControlView().environment(model))
+        try await shoot("flat-ipad-landscape-running", Device.tabletLandscape.plain, ControlView().environment(model))
     }
 
     // MARK: Other sizes
@@ -213,16 +213,18 @@ struct ScreenshotTests {
             try await shoot("store/ipad-" + name, .storeTablet, StoreChrome(tablet: true) { ControlView() }.environment(model))
         }
         // What the room sees, on the iPad's set as the listing has it today.
-        try await shoot("store/ipad-5-screen", .storeTablet, DisplayView().environment(message))
+        try await shoot("store/ipad-5-screen", Device.storeTablet.plain, DisplayView().environment(message))
     }
 
     // MARK: How it moves
 
     /// A film of a view with glass in it is of the part of the view that fits the simulator's
-    /// screen (`picture`): the top of a phone unless it says otherwise. These are the bottom of a
-    /// phone, for the message card, and the rows of keys under an iPad's monitor.
+    /// screen (`picture`), so that no frame waits for the view to be moved: the top of a phone
+    /// unless it says otherwise. These are the bottom of a phone, for the message card, and two
+    /// stretches of the rows of keys under an iPad's monitor: 2m to 20m, and the Black out key.
     private static let phoneFoot = CGRect(x: 0, y: 104, width: 393, height: 748)
-    private static let tabletKeys = CGRect(x: 0, y: 430, width: 708, height: 280)
+    private static let tabletLengths = CGRect(x: 110, y: 430, width: 354, height: 280)
+    private static let tabletBlackout = CGRect(x: 340, y: 430, width: 354, height: 280)
 
     @Test func choosingALength() async throws {
         let short = timer(length: 60)
@@ -230,10 +232,10 @@ struct ScreenshotTests {
         let near = timer()
         try await film("length-5m-to-3m", .phone, ControlView().environment(near)) { near.setDuration(3 * 60) }
         let far = timer()
-        try await film("ipad-length-5m-to-20m", .tabletLandscape, ControlView().environment(far), part: Self.tabletKeys) { far.setDuration(20 * 60) }
+        try await film("ipad-length-5m-to-20m", .tabletLandscape, ControlView().environment(far), part: Self.tabletLengths) { far.setDuration(20 * 60) }
         // A custom length lights nothing in the row, so there is nowhere for the amber to come from.
         let custom = timer(length: 7 * 60 + 30)
-        try await film("ipad-length-custom-to-3m", .tabletLandscape, ControlView().environment(custom), part: Self.tabletKeys) { custom.setDuration(3 * 60) }
+        try await film("ipad-length-custom-to-3m", .tabletLandscape, ControlView().environment(custom), part: Self.tabletLengths) { custom.setDuration(3 * 60) }
     }
 
     /// Before a start the nudge keys edit the length itself, on and off the lengths in the row.
@@ -244,9 +246,9 @@ struct ScreenshotTests {
         let on = timer(length: 9 * 60)
         try await film("step-9m-plus-1min", .phone, ControlView().environment(on)) { on.step(by: 60) }
         let pad = timer()
-        try await film("ipad-step-5m-plus-10s", .tabletLandscape, ControlView().environment(pad), part: Self.tabletKeys) { pad.step(by: 10) }
+        try await film("ipad-step-5m-plus-10s", .tabletLandscape, ControlView().environment(pad), part: Self.tabletLengths) { pad.step(by: 10) }
         let back = timer(length: 5 * 60 + 10)
-        try await film("ipad-step-back-onto-5m", .tabletLandscape, ControlView().environment(back), part: Self.tabletKeys) { back.step(by: -10) }
+        try await film("ipad-step-back-onto-5m", .tabletLandscape, ControlView().environment(back), part: Self.tabletLengths) { back.step(by: -10) }
     }
 
     @Test func blackingOut() async throws {
@@ -254,7 +256,7 @@ struct ScreenshotTests {
         try await film("blackout-on", .phone, ControlView().environment(model)) { model.blackout = true }
         try await film("blackout-off", .phone, ControlView().environment(model)) { model.blackout = false }
         let pad = timer(elapsed: 30.5)
-        try await film("ipad-blackout-on", .tabletLandscape, ControlView().environment(pad), part: Self.tabletKeys) { pad.blackout = true }
+        try await film("ipad-blackout-on", .tabletLandscape, ControlView().environment(pad), part: Self.tabletBlackout) { pad.blackout = true }
         let room = timer(elapsed: 30.5)
         try await film("screen-blackout-on", .screen, DisplayView().environment(room)) { room.blackout = true }
     }
@@ -352,6 +354,11 @@ private struct Device {
     /// own screen: such a view is drawn a screenful at a time (`picture`).
     var glass = true
 
+    /// Where the control surface's glass keys are at this size, for a size whose monitor would
+    /// not fit one piece of a picture (`picture`). Measured off a picture; move a key out of
+    /// them and it is drawn as glass is off the screen, which is wrongly.
+    var keys: [CGRect]?
+
     /// The same size for a view, or a film, in which the glass does not matter.
     var plain: Device {
         var device = self
@@ -360,15 +367,30 @@ private struct Device {
     }
 
     static let phone = Device(size: CGSize(width: 393, height: 852), safeArea: EdgeInsets(top: 59, leading: 0, bottom: 34, trailing: 0))
-    static let phoneLandscape = Device(size: CGSize(width: 852, height: 393), safeArea: EdgeInsets(top: 0, leading: 59, bottom: 21, trailing: 59))
+    static let phoneLandscape = Device(
+        size: CGSize(width: 852, height: 393), safeArea: EdgeInsets(top: 0, leading: 59, bottom: 21, trailing: 59),
+        keys: [CGRect(x: 60, y: 290, width: 440, height: 103)]
+    )
     static let smallPhone = Device(size: CGSize(width: 375, height: 667), safeArea: EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
-    static let tabletLandscape = Device(size: CGSize(width: 1180, height: 820), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1)
-    static let tabletPortrait = Device(size: CGSize(width: 820, height: 1180), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1)
+    static let tabletLandscape = Device(
+        size: CGSize(width: 1180, height: 820), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1,
+        keys: [CGRect(x: 0, y: 430, width: 708, height: 280)]
+    )
+    static let tabletPortrait = Device(
+        size: CGSize(width: 820, height: 1180), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1,
+        keys: [CGRect(x: 640, y: 20, width: 100, height: 52), CGRect(x: 80, y: 432, width: 660, height: 240)]
+    )
     static let screen = Device(size: CGSize(width: 1280, height: 720), scale: 1, glass: false)
     /// 1320 x 2868, the 6.9 inch iPhone.
-    static let storePhone = Device(size: CGSize(width: 440, height: 956), safeArea: EdgeInsets(top: 62, leading: 0, bottom: 34, trailing: 0), scale: 3)
+    static let storePhone = Device(
+        size: CGSize(width: 440, height: 956), safeArea: EdgeInsets(top: 62, leading: 0, bottom: 34, trailing: 0), scale: 3,
+        keys: [CGRect(x: 360, y: 66, width: 80, height: 60), CGRect(x: 0, y: 354, width: 440, height: 240)]
+    )
     /// 2752 x 2064, the 13 inch iPad on its side.
-    static let storeTablet = Device(size: CGSize(width: 1376, height: 1032), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 2)
+    static let storeTablet = Device(
+        size: CGSize(width: 1376, height: 1032), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 2,
+        keys: [CGRect(x: 0, y: 518, width: 826, height: 250)]
+    )
 }
 
 private let folder = URL(fileURLWithPath: #filePath)
@@ -444,41 +466,68 @@ private func firstPart(of canvas: UIView, _ device: Device) -> CGRect {
     )
 }
 
-/// A picture of a view, or of `part` of it. A view with glass in it is moved so that each piece
-/// of it in turn is on the stage, a fringe inside the stage's edge wherever the view goes on
-/// past it, and only that piece is kept from each drawing.
+/// A picture of a view, or of `part` of it for a film.
+///
+/// A view with glass in it is moved so that each piece of it in turn is on the stage, a fringe
+/// inside the stage's edge wherever the view goes on past it, and only that piece is kept from
+/// each drawing. Glass that has just come onto the screen is not drawn yet in the same moment,
+/// so every move is followed by a wait. That takes long enough for the time on the monitor to
+/// change between two pieces, which is why a device whose monitor would be in more than one
+/// piece says where its keys are (`Device.keys`): it is drawn whole once, and the keys alone
+/// are drawn again in pieces over that.
 @MainActor
-private func picture(of canvas: UIView, _ device: Device, part: CGRect? = nil) -> UIImage {
+private func picture(of canvas: UIView, _ device: Device, part: CGRect? = nil) async -> UIImage {
     let format = UIGraphicsImageRendererFormat()
     format.scale = device.scale
     format.opaque = true
     let bounds = CGRect(origin: .zero, size: device.size)
-    let part = part ?? bounds
     let stage = canvas.window.map { onScreen(in: $0) } ?? bounds
-    return UIGraphicsImageRenderer(bounds: part, format: format).image { context in
-        canvas.frame.origin = stage.origin
-        guard device.glass else {
+    func draw(_ rect: CGRect) -> UIImage {
+        UIGraphicsImageRenderer(bounds: rect, format: format).image { _ in
             canvas.drawHierarchy(in: bounds, afterScreenUpdates: true)
-            return
         }
-        var y = part.minY
-        while y < part.maxY {
+    }
+    guard device.glass else {
+        return draw(part ?? bounds)
+    }
+
+    var whole: UIImage?
+    var regions = [part ?? bounds]
+    if part == nil, let keys = device.keys {
+        canvas.frame.origin = stage.origin
+        whole = draw(bounds)
+        regions = keys.map { $0.intersection(bounds) }
+    }
+    var pieces = [(rect: CGRect, image: UIImage)]()
+    for region in regions {
+        var y = region.minY
+        while y < region.maxY {
             let top = y == 0 ? 0 : fringe
-            let height = y + stage.height - top >= bounds.maxY ? part.maxY - y : min(stage.height - top - fringe, part.maxY - y)
-            var x = part.minX
-            while x < part.maxX {
+            let height = y + stage.height - top >= bounds.maxY ? region.maxY - y : min(stage.height - top - fringe, region.maxY - y)
+            var x = region.minX
+            while x < region.maxX {
                 let lead = x == 0 ? 0 : fringe
-                let width = x + stage.width - lead >= bounds.maxX ? part.maxX - x : min(stage.width - lead - fringe, part.maxX - x)
-                canvas.frame.origin = CGPoint(x: stage.minX + lead - x, y: stage.minY + top - y)
-                context.cgContext.saveGState()
-                context.cgContext.clip(to: CGRect(x: x, y: y, width: width, height: height))
-                canvas.drawHierarchy(in: bounds, afterScreenUpdates: true)
-                context.cgContext.restoreGState()
+                let width = x + stage.width - lead >= bounds.maxX ? region.maxX - x : min(stage.width - lead - fringe, region.maxX - x)
+                let origin = CGPoint(x: stage.minX + lead - x, y: stage.minY + top - y)
+                if canvas.frame.origin != origin {
+                    canvas.frame.origin = origin
+                    try? await Task.sleep(for: .milliseconds(150))
+                }
+                let rect = CGRect(x: x, y: y, width: width, height: height)
+                pieces.append((rect, draw(rect)))
                 x += width
             }
             y += height
         }
-        canvas.frame.origin = stage.origin
+    }
+    if whole == nil, pieces.count == 1, pieces[0].rect == (part ?? bounds) {
+        return pieces[0].image
+    }
+    return UIGraphicsImageRenderer(bounds: part ?? bounds, format: format).image { _ in
+        whole?.draw(in: bounds)
+        for piece in pieces {
+            piece.image.draw(in: piece.rect)
+        }
     }
 }
 
@@ -491,7 +540,7 @@ private func strike(_ window: UIWindow) {
 @MainActor
 private func shoot(_ name: String, _ device: Device, _ view: some View) async throws {
     let (window, canvas) = try await mount(device, view)
-    let image = picture(of: canvas, device)
+    let image = await picture(of: canvas, device)
     strike(window)
 
     let file = folder.appendingPathComponent(name + ".png")
@@ -605,7 +654,7 @@ private func film(
     Motion.slowdown = slowdown
     defer { Motion.slowdown = 1 }
     var frames = [(name: String, image: UIImage)]()
-    frames.append(("0000-before", picture(of: canvas, device, part: part)))
+    frames.append(("0000-before", await picture(of: canvas, device, part: part)))
     let clock = ContinuousClock()
     let start = clock.now
     change()
@@ -614,7 +663,7 @@ private func film(
         try await Task.sleep(for: .milliseconds(12))
         let passed = (clock.now - start).components
         let milliseconds = Int(passed.seconds) * 1000 + Int(passed.attoseconds / 1_000_000_000_000_000)
-        frames.append((String(format: "%04d", milliseconds), picture(of: canvas, device, part: part)))
+        frames.append((String(format: "%04d", milliseconds), await picture(of: canvas, device, part: part)))
     }
     strike(window)
 

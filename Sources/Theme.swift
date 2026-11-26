@@ -64,9 +64,10 @@ enum Motion {
     static var state: Animation { paced(.spring(duration: 0.42, bounce: 0.16)) }
     static var fade: Animation { paced(.easeInOut(duration: 0.3)) }
     /// The words on a key whose body is turning amber or back. Dark words read only on amber and
-    /// light ones only on the dark, so they change in a moment, halfway through the body's change
-    /// (which on glass is about a fifth of a second in), and not along with it.
-    static var ink: Animation { paced(.easeInOut(duration: 0.1).delay(0.15)) }
+    /// light ones only on the dark, so they do not fade from one to the other, which passes
+    /// through a grey that cannot be read on a key half way to amber: they change at a stroke,
+    /// about when the body is half way (on glass, a fifth of a second in).
+    static var ink: Animation { paced(.linear(duration: 0.02).delay(0.18)) }
 
     /// One word taking another's place: the old one is gone before the new one arrives. Two
     /// words fading through each other in the same place are neither of them for a moment, and
@@ -226,17 +227,6 @@ extension View {
             }
         } else {
             background(lit ?? fallback, in: Capsule())
-        }
-    }
-
-    /// A sheet that stops halfway is glass where the system has it. Before that it is the
-    /// surface colour, like the cards.
-    @ViewBuilder
-    func sheetGround() -> some View {
-        if #available(iOS 26.0, *) {
-            self
-        } else {
-            presentationBackground(Theme.surface)
         }
     }
 }

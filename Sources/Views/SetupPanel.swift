@@ -239,9 +239,7 @@ struct DurationPicker: View {
                     }
                     .pickerStyle(.segmented)
                 }
-                // The wheels stand in a well of the ground colour. The sheet around them is
-                // glass where the system has it, and through glass the controls behind showed
-                // between the numbers.
+                // The wheels stand in a well of the ground colour, as the message does in its card.
                 HStack(spacing: 0) {
                     wheel($h, 0..<24, "h")
                     wheel($m, 0..<60, "min")
@@ -266,7 +264,10 @@ struct DurationPicker: View {
             }
         }
         .presentationDetents([.medium])
-        .sheetGround()
+        // The surface colour, not the glass the system would give a sheet that stops halfway:
+        // through that the Start key behind lit the title up in amber, and the sheet is read
+        // in the same dim room as the rest.
+        .presentationBackground(Theme.surface)
         .tint(Theme.amber)
         .preferredColorScheme(.dark)
         .onAppear {
