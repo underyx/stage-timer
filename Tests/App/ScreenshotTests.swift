@@ -159,18 +159,22 @@ struct ScreenshotTests {
         try await film("length-5m-to-3m", .phone, ControlView().environment(near)) { near.setDuration(3 * 60) }
         let far = timer()
         try await film("ipad-length-5m-to-20m", .tabletLandscape, ControlView().environment(far)) { far.setDuration(20 * 60) }
+        // From a custom length the amber does not travel: its key is off the end of a phone's strip.
+        let custom = timer(length: 7 * 60 + 30)
+        try await film("ipad-length-custom-to-3m", .tabletLandscape, ControlView().environment(custom)) { custom.setDuration(3 * 60) }
     }
 
     /// Before a start the nudge keys edit the length itself, on and off the lengths in the row.
+    /// `step` is what the keys call.
     @Test func steppingTheLength() async throws {
         let off = timer()
-        try await film("step-5m-plus-10s", .phone, ControlView().environment(off)) { off.adjust(by: 10) }
+        try await film("step-5m-plus-10s", .phone, ControlView().environment(off)) { off.step(by: 10) }
         let on = timer(length: 9 * 60)
-        try await film("step-9m-plus-1min", .phone, ControlView().environment(on)) { on.adjust(by: 60) }
+        try await film("step-9m-plus-1min", .phone, ControlView().environment(on)) { on.step(by: 60) }
         let pad = timer()
-        try await film("ipad-step-5m-plus-10s", .tabletLandscape, ControlView().environment(pad)) { pad.adjust(by: 10) }
+        try await film("ipad-step-5m-plus-10s", .tabletLandscape, ControlView().environment(pad)) { pad.step(by: 10) }
         let back = timer(length: 5 * 60 + 10)
-        try await film("ipad-step-back-onto-5m", .tabletLandscape, ControlView().environment(back)) { back.adjust(by: -10) }
+        try await film("ipad-step-back-onto-5m", .tabletLandscape, ControlView().environment(back)) { back.step(by: -10) }
     }
 
     @Test func blackingOut() async throws {

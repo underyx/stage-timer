@@ -22,7 +22,9 @@ struct MessageCard: View {
                 Spacer()
                 if live {
                     OnScreenTally(pulsing: !reduceMotion)
-                        .transition(AnyTransition.opacity.combined(with: .move(edge: .trailing)))
+                        // Not `.move`: that starts a whole width to the right, which is
+                        // past the card's edge and the screen's.
+                        .transition(AnyTransition.opacity.combined(with: .scale(scale: 0.85, anchor: .trailing)))
                 }
             }
             .frame(height: 16)

@@ -353,27 +353,24 @@ private struct BlackoutButton: View {
 
     var body: some View {
         Button { model.blackout.toggle() } label: {
-            // Both titles and both icons are laid out and one of each is shown, so the key is
-            // exactly as wide blacked out as not. A key that grows when it is pressed slides
-            // under the finger and pushes the line beside it about while its fill arrives.
+            // One title, and both icons laid out with one of them shown, so the key is exactly
+            // as wide lit as not. When it grew to say "Blacked out" its amber arrived outside
+            // the margin, and the line beside it lost the room for "over since 12:16 AM". The
+            // monitor above says what state the screen is in.
             Label {
-                ZStack {
-                    Text("Black out").fontWeight(.medium).opacity(model.blackout ? 0 : 1)
-                    Text("Blacked out").fontWeight(.bold).opacity(model.blackout ? 1 : 0)
-                }
+                Text("Black out")
             } icon: {
                 ZStack {
                     Image(systemName: "eye.slash").opacity(model.blackout ? 0 : 1)
                     Image(systemName: "eye.slash.fill").opacity(model.blackout ? 1 : 0)
                 }
-                .fontWeight(.semibold)
             }
+            .fontWeight(.semibold)
         }
         .buttonStyle(ChipStyle(selected: model.blackout, radius: 22))
         .animation(Motion.fade, value: model.blackout)
         .keyboardShortcut("b", modifiers: [])
         .sensoryFeedback(.selection, trigger: model.blackout)
-        .accessibilityLabel("Black out")
         .accessibilityAddTraits(model.blackout ? .isSelected : [])
     }
 }
@@ -386,9 +383,10 @@ private struct LengthRow: View {
     @Environment(TimerModel.self) private var model
     @Binding var sheet: ControlSheet?
     @State private var pending: TimeInterval?
-    /// Counts the lengths chosen here, and those of them the amber should glide to.
+    /// Counts the lengths chosen here, for the click that answers a pick.
     @State private var picks = 0
-    @State private var glides = 0
+    /// Whether the length before this one was a custom one.
+    @State private var wasCustom = false
     // One per arrangement: only one is ever on screen, but both are measured.
     @Namespace private var spread
     @Namespace private var strip
@@ -421,10 +419,12 @@ private struct LengthRow: View {
                         }
                     }
                 }
-                // Not on every change of length: before a start the nudge keys change it too,
-                // and a highlight that travels to the custom key at the far end and back every
-                // few steps is noise. A length stepped to lights its key where it is.
-                .animation(Motion.glide, value: glides)
+                // The amber glides between the lengths in the row, but neither to nor from the
+                // custom key, which on a phone is somewhere off the end of the strip. A length
+                // reached with the nudge keys does not glide either: `TimerModel.step` sees to
+                // that, or the highlight would fly to the far end and back every few steps.
+                .animation(isCustom || wasCustom ? nil : Motion.glide, value: model.duration)
+                .onChange(of: isCustom, initial: true) { _, custom in wasCustom = custom }
                 .sensoryFeedback(.selection, trigger: picks)
             case .stopwatch:
                 Button { sheet = .elapsed } label: {
@@ -491,11 +491,8 @@ private struct LengthRow: View {
         }
     }
 
-    /// Sets a length picked from the row. The amber glides to it from another of the lengths,
-    /// but not from the custom key, which on a phone is somewhere off the end of the strip.
     private func choose(_ seconds: TimeInterval) {
         picks += 1
-        if !isCustom { glides += 1 }
         model.setDuration(seconds)
     }
 }

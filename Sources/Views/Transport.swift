@@ -178,10 +178,7 @@ struct NudgeRow: View {
         HStack(spacing: 8) {
             ForEach(Self.steps) { step in
                 Button {
-                    switch model.mode {
-                    case .countdown: model.adjust(by: step.seconds)
-                    case .stopwatch: model.shiftElapsed(by: step.seconds)
-                    }
+                    model.step(by: step.seconds)
                     taps += 1
                     onNudge(step.seconds)
                 } label: {
@@ -196,5 +193,25 @@ struct NudgeRow: View {
         }
         .frame(height: 48)
         .sensoryFeedback(.selection, trigger: taps)
+    }
+}
+
+extension TimerModel {
+    /// One press of a nudge key: more or less time for a countdown, the time already counted
+    /// shifted for a stopwatch.
+    ///
+    /// Nothing animates for it. The keys repeat while held, and before a start they edit the
+    /// length itself, which passes over the lengths in the row: every animation that follows the
+    /// length (the highlight gliding, the colour fading as a step crosses into the last minute)
+    /// would be started and cut off several times a second.
+    func step(by seconds: TimeInterval) {
+        var still = Transaction()
+        still.disablesAnimations = true
+        withTransaction(still) {
+            switch mode {
+            case .countdown: adjust(by: seconds)
+            case .stopwatch: shiftElapsed(by: seconds)
+            }
+        }
     }
 }

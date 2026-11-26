@@ -97,6 +97,8 @@ private struct Face: View {
 
             if let progress = snapshot.progress {
                 ProgressBar(progress: progress, color: color, height: max(unit * 0.018, 3))
+                    // The bar turns with the digits, not ahead of them.
+                    .animation(Motion.paced(.easeInOut(duration: 0.6)), value: snapshot.phase)
             }
         }
         .animation(Motion.paced(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.55, bounce: 0.12)), value: sharing)
