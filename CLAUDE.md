@@ -119,10 +119,12 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   animation at all but a blend by the time past zero: an animation under the overtime pulse,
   which changes the colour every tick, sent the digits through cyan and green.
 - **Words that change on a key go through `KeyTitle`, and a key's ink through `View.ink`.** Two
-  titles cross-fading in one place were neither for a third of the change, so the old word leaves
-  first. Ink fading along with a body that turns amber is grey on brown halfway, and an animation
-  scoped to the foreground style did not stop it: the ink drawn is state, changed at a stroke once
-  the body has turned far enough for it to be read (`Motion.inkHold`).
+  titles cross-fading in one place were neither for a third of the change, so the old word goes at
+  once and the new one fades in. Ink fading along with a body that turns amber is grey on brown
+  halfway, and an animation scoped to the foreground style did not stop it: `Ink` animates a
+  number along with the body and draws one ink or the other by where the number is. Don't time it
+  with a `Task` instead: a film stalls animations for its first half second and not a clock, so
+  the film showed the ink turning on a body that had not moved.
 - **A control must not change size when its state does.** The Black out key has one title and
   lays out both of its icons: when it grew to say "Blacked out", its amber fill arrived outside
   the margin, and a key held at that width left no room for the line beside it.

@@ -69,23 +69,15 @@ enum Motion {
     /// Something changing what it is: Start becoming Pause, a card going live.
     static var state: Animation { paced(.spring(duration: 0.42, bounce: 0.16)) }
     static var fade: Animation { paced(.easeInOut(duration: 0.3)) }
-    /// How long the words on a key keep their ink once the body under them has begun to turn
-    /// amber, or to turn back (`View.ink`). Light words read on the dark and on the brown half way,
-    /// dark ones only on amber: so the words go dark once the body is most of the way to amber and
-    /// go light as soon as it has left it. Glass takes a tint more slowly than a fill takes a
-    /// colour (it was half way a quarter of a second in, in the films), hence the two pairs.
-    static func inkHold(dark: Bool, glass: Bool) -> Duration {
-        let seconds = glass ? (dark ? 0.28 : 0.16) : (dark ? 0.14 : 0.07)
-        return .seconds(seconds * slowdown)
-    }
-
     /// One word taking another's place: the old one is gone before the new one arrives. Two
     /// words fading through each other in the same place are neither of them for a moment, and
-    /// on the Start key that moment was a third of the change.
+    /// on the Start key that moment was a third of the change. The old word does not fade out
+    /// either: it stays where it was while the icon beside it is already where the new word
+    /// wants it, and a longer word leaving had the icon against its first letter.
     static var swap: AnyTransition {
         AnyTransition.asymmetric(
-            insertion: AnyTransition.opacity.animation(paced(.easeOut(duration: 0.2).delay(0.08))),
-            removal: AnyTransition.opacity.animation(paced(.easeIn(duration: 0.08)))
+            insertion: AnyTransition.opacity.animation(paced(.easeOut(duration: 0.18).delay(0.02))),
+            removal: AnyTransition.opacity.animation(paced(.linear(duration: 0.02)))
         )
     }
 
@@ -210,10 +202,7 @@ struct KeyTitle: View {
     }
 
     var body: some View {
-        // The word that is leaving is not counted in the width, so the icon beside it is already
-        // where the new word wants it. Kept to its leading edge the old word stays clear of the
-        // icon; centred, the longer of two words lay over it while it left.
-        ZStack(alignment: .leading) {
+        ZStack {
             Text(text)
                 .id(text)
                 .transition(Motion.swap)
@@ -226,38 +215,44 @@ struct KeyTitle: View {
 ///
 /// The ink never fades from one to the other. Half way there it is a grey, on a body that is
 /// half way to amber, and the word cannot be read; and an animation scoped to the foreground
-/// style did not reach the words, which faded with the body whatever it said. So the ink that is
-/// drawn is kept here and changed at a stroke, outside any animation, once the body has changed
-/// enough for the new ink to be read on it (`Motion.inkHold`).
-private struct Ink: ViewModifier {
+/// style did not reach the words, which faded with the body whatever it said. So what animates
+/// here is a number, how far the body is on its way to amber, on whatever curve the body is
+/// changing on; the ink is one or the other by where that number is, and changes at a stroke.
+///
+/// Light ink reads on the dark and on the brown half way, dark ink only on amber. A flat fill is
+/// where the number says it is. Glass takes its tint later than that, so on glass the ink waits
+/// for the number to be nearly there in either direction.
+private struct Ink: ViewModifier, Animatable {
+    /// How far the body is on its way to amber, 0 to 1.
+    var amber: Double
     var ink: Color
     var glass: Bool
-    @State private var drawn: Color
-    @State private var change: Task<Void, Never>?
 
     init(_ ink: Color, glass: Bool) {
+        self.amber = ink == Theme.onAmber ? 1 : 0
         self.ink = ink
         self.glass = glass
-        _drawn = State(initialValue: ink)
+    }
+
+    nonisolated var animatableData: Double {
+        get { amber }
+        set { amber = newValue }
     }
 
     func body(content: Content) -> some View {
-        content
-            .foregroundStyle(drawn)
-            .onChange(of: ink) { _, ink in
-                change?.cancel()
-                let hold = Motion.inkHold(dark: ink == Theme.onAmber, glass: glass)
-                change = Task {
-                    try? await Task.sleep(for: hold)
-                    guard !Task.isCancelled else { return }
-                    drawn = ink
-                }
-            }
+        content.foregroundStyle(drawn)
+    }
+
+    private var drawn: Color {
+        let dark = ink == Theme.onAmber
+        let turn = glass ? (dark ? 0.85 : 0.3) : 0.6
+        if amber > turn { return Theme.onAmber }
+        return dark ? Theme.text : ink
     }
 }
 
 extension View {
-    /// The ink of a key's words, changed at a stroke when the key's state changes (`Ink`).
+    /// The ink of a key's words, changed at a stroke part of the way through the body's change (`Ink`).
     func ink(_ ink: Color, glass: Bool) -> some View {
         modifier(Ink(ink, glass: glass))
     }
