@@ -54,7 +54,7 @@ struct MessageCard: View {
 
             Button { model.showMessage.toggle() } label: {
                 Label {
-                    Text(live ? "Hide from screen" : "Show on screen").contentTransition(.opacity)
+                    KeyTitle(live ? "Hide from screen" : "Show on screen")
                 } icon: {
                     Image(systemName: live ? "eye.slash" : "display")
                         .contentTransition(.symbolEffect(.replace))

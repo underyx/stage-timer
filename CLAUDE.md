@@ -62,6 +62,13 @@ animation that does not come from `Motion` (use `Motion.paced` for a one-off) is
 over in two frames. Still unseen: what a finger adds (a key going down, the hold on Reset), what
 the system animates at its own pace, and haptics.
 
+**Liquid Glass is only drawn truly on the simulator's own screen.** It is made from what is behind
+it there; past the screen's edge it is given the edge's last column of pixels, and a key showed a
+band of the key beside it. The views drawn are larger than a phone's screen, so `picture` moves a
+view across the screen and keeps a screenful from each drawing, and a film is of one screenful
+(`part`, the top left one unless the film says otherwise). A device with `glass` off is drawn in one
+go, as the display is.
+
 CI cannot see a real external display, AirPlay, Stage Manager or the lock button. A change to the
 scene code or `LockKeepalive` is unverified until someone runs it on hardware, whatever CI says.
 
@@ -107,6 +114,10 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   as state and starts the fade with `withAnimation` from `onChange`. Amber to red at zero is no
   animation at all but a blend by the time past zero: an animation under the overtime pulse,
   which changes the colour every tick, sent the digits through cyan and green.
+- **Words that change on a key go through `KeyTitle`, and a key's ink through `Motion.ink`.** Two
+  titles cross-fading in one place were neither for a third of the change, and ink fading along
+  with a body that turns amber is dark on dark halfway. The old word leaves first; the ink flips
+  in a moment, mid-change.
 - **A control must not change size when its state does.** The Black out key has one title and
   lays out both of its icons: when it grew to say "Blacked out", its amber fill arrived outside
   the margin, and a key held at that width left no room for the line beside it.

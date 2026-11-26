@@ -239,11 +239,16 @@ struct DurationPicker: View {
                     }
                     .pickerStyle(.segmented)
                 }
+                // The wheels stand in a well of the ground colour. The sheet around them is
+                // glass where the system has it, and through glass the controls behind showed
+                // between the numbers.
                 HStack(spacing: 0) {
                     wheel($h, 0..<24, "h")
                     wheel($m, 0..<60, "min")
                     wheel($s, 0..<60, "s")
                 }
+                .padding(.horizontal, 8)
+                .background(Theme.ground, in: RoundedRectangle(cornerRadius: Theme.groupRadius, style: .continuous))
             }
             .padding()
             .navigationTitle(title)

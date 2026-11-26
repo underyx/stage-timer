@@ -29,7 +29,7 @@ struct Transport: View {
         HStack(spacing: 8) {
             Button { model.toggle() } label: {
                 Label {
-                    Text(title).contentTransition(.opacity)
+                    KeyTitle(title)
                 } icon: {
                     Image(systemName: model.isRunning ? "pause.fill" : "play.fill")
                         .contentTransition(.symbolEffect(.replace))

@@ -63,6 +63,20 @@ enum Motion {
     /// Something changing what it is: Start becoming Pause, a card going live.
     static var state: Animation { paced(.spring(duration: 0.42, bounce: 0.16)) }
     static var fade: Animation { paced(.easeInOut(duration: 0.3)) }
+    /// The words on a key whose body is turning amber or back. Dark words read only on amber and
+    /// light ones only on the dark, so they change in a moment, halfway through the body's change
+    /// (which on glass is about a fifth of a second in), and not along with it.
+    static var ink: Animation { paced(.easeInOut(duration: 0.1).delay(0.15)) }
+
+    /// One word taking another's place: the old one is gone before the new one arrives. Two
+    /// words fading through each other in the same place are neither of them for a moment, and
+    /// on the Start key that moment was a third of the change.
+    static var swap: AnyTransition {
+        AnyTransition.asymmetric(
+            insertion: AnyTransition.opacity.animation(paced(.easeOut(duration: 0.2).delay(0.08))),
+            removal: AnyTransition.opacity.animation(paced(.easeIn(duration: 0.08)))
+        )
+    }
 
     /// Any other curve, at the pace the rest is moving at.
     static func paced(_ animation: Animation) -> Animation {
@@ -110,8 +124,9 @@ struct KeyStyle: ButtonStyle {
                 .minimumScaleFactor(0.7)
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .foregroundStyle(style.ink)
-                .animation(Motion.state, value: style.ink)
+                // Only the colour takes this curve; what else changes in the label keeps the
+                // animation it was changed with.
+                .animation(Motion.ink) { $0.foregroundStyle(style.ink) }
             if #available(iOS 26.0, *) {
                 if style.glass && Theme.glass {
                     // The glass answers a finger itself, so nothing is drawn here for a press.
@@ -151,7 +166,7 @@ struct ChipStyle: ButtonStyle {
         let label = configuration.label
             .font(.subheadline.weight(.semibold))
             .lineLimit(1)
-            .foregroundStyle(selected ? Theme.onAmber : Theme.text)
+            .animation(Motion.ink) { $0.foregroundStyle(selected ? Theme.onAmber : Theme.text) }
             .padding(.horizontal, 16)
             .frame(minWidth: 50, minHeight: 44)
         if #available(iOS 26.0, *) {
@@ -174,6 +189,24 @@ struct ChipStyle: ButtonStyle {
             .scaleEffect(pressed ? 0.96 : 1)
             .animation(Motion.press, value: pressed)
             .contentShape(Capsule())
+    }
+}
+
+/// The word on a key that says something else when the key's state changes.
+struct KeyTitle: View {
+    var text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        ZStack {
+            Text(text)
+                .id(text)
+                .transition(Motion.swap)
+        }
+        .animation(Motion.state, value: text)
     }
 }
 

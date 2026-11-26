@@ -96,64 +96,22 @@ struct ScreenshotTests {
         try await shoot("phone-hold-to-reset", Device(size: CGSize(width: 393, height: 96)), row.environment(timer(elapsed: 30.5)))
     }
 
-    /// A sheet is put up by the system over the whole window, so this one is a picture of the
-    /// window: larger than a phone, with the view in the middle of it. It is here for the
-    /// sheet's material, not for its place.
-    @Test func lengthSheet() async throws {
-        let view = ControlView()
+    /// A sheet is put up by the system over the whole window, so these are pictures of a window
+    /// that is the simulator's screen and nothing else: whatever phone the tests run on, with
+    /// its own safe area. They are here for the sheets' material and what stands on it.
+    @Test func sheets() async throws {
+        let length = ControlView()
             .environment(timer())
             .sheet(isPresented: .constant(true)) {
                 DurationPicker(title: "Length", confirm: "Set", initial: 5 * 60) { _ in }
             }
-        let (window, _) = try await mount(.phone, view)
-        try await Task.sleep(for: .milliseconds(1500))
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 2
-        let image = UIGraphicsImageRenderer(bounds: window.bounds, format: format).image { _ in
-            window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
-        }
-        window.rootViewController?.dismiss(animated: false)
-        strike(window)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try #require(image.pngData()).write(to: folder.appendingPathComponent("window-length-sheet.png"))
-    }
-
-    /// TEMPORARY, not for main: what Liquid Glass looks like when it is drawn this way, before
-    /// the design leans on it.
-    @Test func glassProbe() async throws {
-        guard #available(iOS 26.0, *) else { return }
-        let stripes = LinearGradient(
-            stops: stride(from: 0.0, to: 1.0, by: 0.1).flatMap { at in
-                [Gradient.Stop(color: Theme.amber, location: at), .init(color: Theme.amber, location: at + 0.05),
-                 .init(color: Theme.ground, location: at + 0.05), .init(color: Theme.ground, location: at + 0.1)]
-            },
-            startPoint: .leading, endPoint: .trailing
-        )
-        let size = CGSize(width: 220, height: 56)
-        let sheet = VStack(spacing: 14) {
-            Text("plain").frame(width: size.width, height: size.height).glassEffect()
-            Text("interactive").frame(width: size.width, height: size.height).glassEffect(.regular.interactive())
-            Text("tint amber").foregroundStyle(Theme.onAmber).frame(width: size.width, height: size.height)
-                .glassEffect(.regular.tint(Theme.amber))
-            Text("amber inside").foregroundStyle(Theme.onAmber).frame(width: size.width, height: size.height)
-                .background(Theme.amber, in: Capsule()).glassEffect()
-            Text("flat amber").foregroundStyle(Theme.onAmber).frame(width: size.width, height: size.height)
-                .background(Theme.amber, in: Capsule())
-            Text("tint raised").frame(width: size.width, height: size.height).glassEffect(.regular.tint(Theme.raised))
-            Text("clear").frame(width: size.width, height: size.height).glassEffect(.clear)
-            Text("on a card").frame(width: size.width, height: size.height).glassEffect()
-                .padding(14).background(Theme.surface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-            Text("over stripes").frame(width: size.width, height: size.height).glassEffect()
-                .padding(14).background(stripes)
-            Text("clear over stripes").frame(width: size.width, height: size.height).glassEffect(.clear)
-                .padding(14).background(stripes)
-        }
-        .font(.headline)
-        .foregroundStyle(Theme.text)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.ground)
-        .preferredColorScheme(.dark)
-        try await shoot("probe-glass", .phone, sheet)
+        try await shootWindow("window-length-sheet", length)
+        let elapsed = ControlView()
+            .environment(timer(mode: .stopwatch, elapsed: 61.5))
+            .sheet(isPresented: .constant(true)) {
+                DurationPicker(title: "Adjust stopwatch", relative: true, initial: 0) { _ in }
+            }
+        try await shootWindow("window-elapsed-sheet", elapsed)
     }
 
     /// iOS 17 and 18 have no Liquid Glass and get flat keys of the same shapes. No simulator in
@@ -221,7 +179,7 @@ struct ScreenshotTests {
             $0.message = "Questions"
             $0.showMessage = true
         }
-        try await shoot("screen-5-four-by-three", Device(size: CGSize(width: 1024, height: 768), scale: 1), DisplayView().environment(narrow))
+        try await shoot("screen-5-four-by-three", Device(size: CGSize(width: 1024, height: 768), scale: 1, glass: false), DisplayView().environment(narrow))
     }
 
     // MARK: The App Store's pictures
@@ -260,16 +218,22 @@ struct ScreenshotTests {
 
     // MARK: How it moves
 
+    /// A film of a view with glass in it is of the part of the view that fits the simulator's
+    /// screen (`picture`): the top of a phone unless it says otherwise. These are the bottom of a
+    /// phone, for the message card, and the rows of keys under an iPad's monitor.
+    private static let phoneFoot = CGRect(x: 0, y: 104, width: 393, height: 748)
+    private static let tabletKeys = CGRect(x: 0, y: 430, width: 708, height: 280)
+
     @Test func choosingALength() async throws {
         let short = timer(length: 60)
         try await film("length-1m-to-10m", .phone, ControlView().environment(short)) { short.setDuration(10 * 60) }
         let near = timer()
         try await film("length-5m-to-3m", .phone, ControlView().environment(near)) { near.setDuration(3 * 60) }
         let far = timer()
-        try await film("ipad-length-5m-to-20m", .tabletLandscape, ControlView().environment(far)) { far.setDuration(20 * 60) }
+        try await film("ipad-length-5m-to-20m", .tabletLandscape, ControlView().environment(far), part: Self.tabletKeys) { far.setDuration(20 * 60) }
         // A custom length lights nothing in the row, so there is nowhere for the amber to come from.
         let custom = timer(length: 7 * 60 + 30)
-        try await film("ipad-length-custom-to-3m", .tabletLandscape, ControlView().environment(custom)) { custom.setDuration(3 * 60) }
+        try await film("ipad-length-custom-to-3m", .tabletLandscape, ControlView().environment(custom), part: Self.tabletKeys) { custom.setDuration(3 * 60) }
     }
 
     /// Before a start the nudge keys edit the length itself, on and off the lengths in the row.
@@ -280,9 +244,9 @@ struct ScreenshotTests {
         let on = timer(length: 9 * 60)
         try await film("step-9m-plus-1min", .phone, ControlView().environment(on)) { on.step(by: 60) }
         let pad = timer()
-        try await film("ipad-step-5m-plus-10s", .tabletLandscape, ControlView().environment(pad)) { pad.step(by: 10) }
+        try await film("ipad-step-5m-plus-10s", .tabletLandscape, ControlView().environment(pad), part: Self.tabletKeys) { pad.step(by: 10) }
         let back = timer(length: 5 * 60 + 10)
-        try await film("ipad-step-back-onto-5m", .tabletLandscape, ControlView().environment(back)) { back.step(by: -10) }
+        try await film("ipad-step-back-onto-5m", .tabletLandscape, ControlView().environment(back), part: Self.tabletKeys) { back.step(by: -10) }
     }
 
     @Test func blackingOut() async throws {
@@ -290,15 +254,15 @@ struct ScreenshotTests {
         try await film("blackout-on", .phone, ControlView().environment(model)) { model.blackout = true }
         try await film("blackout-off", .phone, ControlView().environment(model)) { model.blackout = false }
         let pad = timer(elapsed: 30.5)
-        try await film("ipad-blackout-on", .tabletLandscape, ControlView().environment(pad)) { pad.blackout = true }
+        try await film("ipad-blackout-on", .tabletLandscape, ControlView().environment(pad), part: Self.tabletKeys) { pad.blackout = true }
         let room = timer(elapsed: 30.5)
         try await film("screen-blackout-on", .screen, DisplayView().environment(room)) { room.blackout = true }
     }
 
     @Test func showingAMessage() async throws {
         let model = timer(elapsed: 30.5) { $0.message = "Wrap up" }
-        try await film("message-on", .phone, ControlView().environment(model)) { model.showMessage = true }
-        try await film("message-off", .phone, ControlView().environment(model)) { model.showMessage = false }
+        try await film("message-on", .phone, ControlView().environment(model), part: Self.phoneFoot) { model.showMessage = true }
+        try await film("message-off", .phone, ControlView().environment(model), part: Self.phoneFoot) { model.showMessage = false }
         let room = timer(length: 20 * 60, elapsed: 30.5) { $0.message = "5 minutes left" }
         try await film("screen-message-on", .screen, DisplayView().environment(room)) { room.showMessage = true }
         try await film("screen-message-off", .screen, DisplayView().environment(room)) { room.showMessage = false }
@@ -334,7 +298,7 @@ struct ScreenshotTests {
         }
         try await film("mode-to-stopwatch", .phone, ControlView().environment(model)) { model.mode = .stopwatch }
         let pad = timer(elapsed: 30.5)
-        try await film("ipad-clock-on", .tabletLandscape, ControlView().environment(pad)) { pad.showClock = true }
+        try await film("ipad-clock-on", Device.tabletLandscape.plain, ControlView().environment(pad)) { pad.showClock = true }
     }
 }
 
@@ -384,13 +348,23 @@ private struct Device {
     var size: CGSize
     var safeArea = EdgeInsets()
     var scale: CGFloat = 2
+    /// Whether the view has Liquid Glass in it, which is only drawn truly on the simulator's
+    /// own screen: such a view is drawn a screenful at a time (`picture`).
+    var glass = true
+
+    /// The same size for a view, or a film, in which the glass does not matter.
+    var plain: Device {
+        var device = self
+        device.glass = false
+        return device
+    }
 
     static let phone = Device(size: CGSize(width: 393, height: 852), safeArea: EdgeInsets(top: 59, leading: 0, bottom: 34, trailing: 0))
     static let phoneLandscape = Device(size: CGSize(width: 852, height: 393), safeArea: EdgeInsets(top: 0, leading: 59, bottom: 21, trailing: 59))
     static let smallPhone = Device(size: CGSize(width: 375, height: 667), safeArea: EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
     static let tabletLandscape = Device(size: CGSize(width: 1180, height: 820), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1)
     static let tabletPortrait = Device(size: CGSize(width: 820, height: 1180), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1)
-    static let screen = Device(size: CGSize(width: 1280, height: 720), scale: 1)
+    static let screen = Device(size: CGSize(width: 1280, height: 720), scale: 1, glass: false)
     /// 1320 x 2868, the 6.9 inch iPhone.
     static let storePhone = Device(size: CGSize(width: 440, height: 956), safeArea: EdgeInsets(top: 62, leading: 0, bottom: 34, trailing: 0), scale: 3)
     /// 2752 x 2064, the 13 inch iPad on its side.
@@ -413,13 +387,26 @@ private func activeScene() async throws -> UIWindowScene {
     return try #require(scenes.first, "the app has no window scene to draw in")
 }
 
-/// How far inside its window a view is drawn. The simulator's own status bar and home bar would
-/// otherwise push every size about, an iPad's and a projector's included, and blur the top of
-/// whatever scrolls. So the view is drawn well inside a larger window, where no part of it is
-/// under them, and is given the device's safe area instead.
+/// How much larger than the view its window is, so that the view can be moved about in it.
 private let margin: CGFloat = 120
 
-/// Puts a view up in a window of the device's size and waits for it to settle.
+/// How near the edge of the simulator's screen a view's glass is still trusted.
+private let fringe: CGFloat = 24
+
+/// The part of a window that is on the simulator's screen and clear of its status bar and home
+/// bar. Liquid Glass is drawn from what is behind it on the screen: past the screen's edge it is
+/// given the edge's last column of pixels instead, and a key there showed a band of the key
+/// beside it. So a view larger than this is moved through it and drawn a part at a time.
+@MainActor
+private func onScreen(in window: UIWindow) -> CGRect {
+    let screen = window.windowScene?.screen.bounds ?? window.bounds
+    let top = max(window.safeAreaInsets.top, 24).rounded(.up)
+    return CGRect(x: 0, y: top, width: screen.width.rounded(.down), height: (screen.height - top - 40).rounded(.down))
+}
+
+/// Puts a view up in a window and waits for it to settle. The view is given the device's size
+/// and safe area and none of the simulator's own, so it is laid out the same wherever in the
+/// window it is moved to.
 @MainActor
 private func mount(_ device: Device, _ view: some View) async throws -> (window: UIWindow, canvas: UIView) {
     let scene = try await activeScene()
@@ -429,6 +416,7 @@ private func mount(_ device: Device, _ view: some View) async throws -> (window:
     window.overrideUserInterfaceStyle = .dark
     let root = UIViewController()
     let host = UIHostingController(rootView: view.safeAreaPadding(device.safeArea))
+    host.safeAreaRegions = []
     host.view.backgroundColor = .black
     host.view.autoresizingMask = []
     root.addChild(host)
@@ -436,22 +424,61 @@ private func mount(_ device: Device, _ view: some View) async throws -> (window:
     host.didMove(toParent: root)
     window.rootViewController = root
     window.isHidden = false
-    host.view.frame = CGRect(origin: CGPoint(x: margin, y: margin), size: device.size)
+    host.view.frame = CGRect(origin: onScreen(in: window).origin, size: device.size)
     window.layoutIfNeeded()
     // Long enough for what animates in on appearing (the connection ring, the message card).
     try await Task.sleep(for: .milliseconds(900))
     return (window, host.view)
 }
 
+/// The part of a view that one drawing covers when it starts at the view's top left corner: all
+/// of a view that fits the stage, and otherwise the stage less the fringe.
 @MainActor
-private func picture(of canvas: UIView, _ device: Device) -> UIImage {
+private func firstPart(of canvas: UIView, _ device: Device) -> CGRect {
+    guard device.glass, let window = canvas.window else { return CGRect(origin: .zero, size: device.size) }
+    let stage = onScreen(in: window)
+    return CGRect(
+        x: 0, y: 0,
+        width: device.size.width <= stage.width ? device.size.width : stage.width - fringe,
+        height: device.size.height <= stage.height ? device.size.height : stage.height - fringe
+    )
+}
+
+/// A picture of a view, or of `part` of it. A view with glass in it is moved so that each piece
+/// of it in turn is on the stage, a fringe inside the stage's edge wherever the view goes on
+/// past it, and only that piece is kept from each drawing.
+@MainActor
+private func picture(of canvas: UIView, _ device: Device, part: CGRect? = nil) -> UIImage {
     let format = UIGraphicsImageRendererFormat()
     format.scale = device.scale
     format.opaque = true
     let bounds = CGRect(origin: .zero, size: device.size)
-    canvas.frame = CGRect(origin: CGPoint(x: margin, y: margin), size: device.size)
-    return UIGraphicsImageRenderer(bounds: bounds, format: format).image { _ in
-        canvas.drawHierarchy(in: bounds, afterScreenUpdates: true)
+    let part = part ?? bounds
+    let stage = canvas.window.map { onScreen(in: $0) } ?? bounds
+    return UIGraphicsImageRenderer(bounds: part, format: format).image { context in
+        canvas.frame.origin = stage.origin
+        guard device.glass else {
+            canvas.drawHierarchy(in: bounds, afterScreenUpdates: true)
+            return
+        }
+        var y = part.minY
+        while y < part.maxY {
+            let top = y == 0 ? 0 : fringe
+            let height = y + stage.height - top >= bounds.maxY ? part.maxY - y : min(stage.height - top - fringe, part.maxY - y)
+            var x = part.minX
+            while x < part.maxX {
+                let lead = x == 0 ? 0 : fringe
+                let width = x + stage.width - lead >= bounds.maxX ? part.maxX - x : min(stage.width - lead - fringe, part.maxX - x)
+                canvas.frame.origin = CGPoint(x: stage.minX + lead - x, y: stage.minY + top - y)
+                context.cgContext.saveGState()
+                context.cgContext.clip(to: CGRect(x: x, y: y, width: width, height: height))
+                canvas.drawHierarchy(in: bounds, afterScreenUpdates: true)
+                context.cgContext.restoreGState()
+                x += width
+            }
+            y += height
+        }
+        canvas.frame.origin = stage.origin
     }
 }
 
@@ -471,6 +498,26 @@ private func shoot(_ name: String, _ device: Device, _ view: some View) async th
     try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
     let png = try #require(image.pngData())
     try png.write(to: file)
+}
+
+/// A picture of a whole window with `view` in it, for what the system puts up over a view.
+@MainActor
+private func shootWindow(_ name: String, _ view: some View) async throws {
+    let scene = try await activeScene()
+    let window = UIWindow(windowScene: scene)
+    window.overrideUserInterfaceStyle = .dark
+    window.rootViewController = UIHostingController(rootView: view)
+    window.isHidden = false
+    try await Task.sleep(for: .milliseconds(2000))
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 2
+    let image = UIGraphicsImageRenderer(bounds: window.bounds, format: format).image { _ in
+        window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+    }
+    window.rootViewController?.dismiss(animated: false)
+    strike(window)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    try #require(image.pngData()).write(to: folder.appendingPathComponent(name + ".png"))
 }
 
 /// What the system draws over an app and a window in a test does not have: the status bar at
@@ -549,14 +596,16 @@ private func film(
     _ name: String,
     _ device: Device,
     _ view: some View,
+    part: CGRect? = nil,
     for length: Duration = .milliseconds(3200),
     _ change: @MainActor () -> Void
 ) async throws {
     let (window, canvas) = try await mount(device, view)
+    let part = part ?? firstPart(of: canvas, device)
     Motion.slowdown = slowdown
     defer { Motion.slowdown = 1 }
     var frames = [(name: String, image: UIImage)]()
-    frames.append(("0000-before", picture(of: canvas, device)))
+    frames.append(("0000-before", picture(of: canvas, device, part: part)))
     let clock = ContinuousClock()
     let start = clock.now
     change()
@@ -565,7 +614,7 @@ private func film(
         try await Task.sleep(for: .milliseconds(12))
         let passed = (clock.now - start).components
         let milliseconds = Int(passed.seconds) * 1000 + Int(passed.attoseconds / 1_000_000_000_000_000)
-        frames.append((String(format: "%04d", milliseconds), picture(of: canvas, device)))
+        frames.append((String(format: "%04d", milliseconds), picture(of: canvas, device, part: part)))
     }
     strike(window)
 

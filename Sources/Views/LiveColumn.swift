@@ -387,6 +387,8 @@ private struct LengthRow: View {
     @State private var picks = 0
 
     private static let presets = [1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
+    /// The strip of lengths, as a coordinate space its content is measured in.
+    private static let strip = "lengths"
 
     var body: some View {
         Group {
@@ -400,7 +402,13 @@ private struct LengthRow: View {
                         ScrollViewReader { proxy in
                             ScrollView(.horizontal, showsIndicators: false) {
                                 track(flexible: false)
+                                    .background {
+                                        GeometryReader { content in
+                                            Color.clear.preference(key: StripFrame.self, value: content.frame(in: .named(Self.strip)))
+                                        }
+                                    }
                             }
+                            .coordinateSpace(.named(Self.strip))
                             .onAppear {
                                 // The first lengths are in view as it is; one further along
                                 // is brought to the middle.
@@ -409,6 +417,7 @@ private struct LengthRow: View {
                                 }
                             }
                         }
+                        .fadingWhereCut()
                         .clipShape(Capsule())
                         .keyGlass()
                     }
@@ -542,6 +551,43 @@ private struct LengthTrack: View {
         Capsule()
             .frame(width: rect.width, height: rect.height)
             .position(x: rect.midX, y: rect.midY)
+    }
+}
+
+/// Where the content of a strip that scrolls sideways is, measured from the strip's own leading
+/// edge: how much of it is out of view on either side.
+private struct StripFrame: PreferenceKey {
+    static var defaultValue: CGRect { .zero }
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+private extension View {
+    /// For the strip of lengths inside its track: an end where more lengths are out of view fades
+    /// out, so a label is never cut through by the track's edge, and an end with nothing beyond
+    /// it is left alone. It is rubbed out of the strip rather than masked, because a mask
+    /// cannot be told how far the strip has been scrolled and an overlay can.
+    func fadingWhereCut() -> some View {
+        overlayPreferenceValue(StripFrame.self) { content in
+            GeometryReader { strip in
+                let width: CGFloat = 28
+                let leading = min(max(-content.minX / 12, 0), 1)
+                let trailing = min(max((content.maxX - strip.size.width) / 12, 0), 1)
+                HStack(spacing: 0) {
+                    LinearGradient(colors: [.black.opacity(leading), .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: width)
+                    Spacer(minLength: 0)
+                    LinearGradient(colors: [.clear, .black.opacity(trailing)], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: width)
+                }
+            }
+            .blendMode(.destinationOut)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+        .compositingGroup()
     }
 }
 
