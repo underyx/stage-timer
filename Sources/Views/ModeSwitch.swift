@@ -48,18 +48,16 @@ struct ModeSwitch: View {
         }
     }
 
+    /// The words are drawn twice, as the lengths are: dim in the track, and bright ones over them
+    /// cut to the lozenge's shape. A word is then bright exactly where the lozenge is under it.
+    /// Drawn once and lit by the mode, the words changed at the tap and the lozenge took a third
+    /// of a second to follow: the bright word stood on the bare track, the dim one on the lozenge.
     private var track: some View {
         let modes = TimerModel.Mode.allCases
         return HStack(spacing: 0) {
             ForEach(modes) { mode in
                 Button { pick(mode) } label: {
-                    Text(mode.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(model.mode == mode ? Theme.text : Theme.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .padding(.horizontal, 8)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    label(mode).foregroundStyle(Theme.secondary)
                 }
                 .buttonStyle(SegmentStyle(inset: Self.inset))
                 .accessibilityAddTraits(model.mode == mode ? .isSelected : [])
@@ -68,16 +66,42 @@ struct ModeSwitch: View {
         .padding(.horizontal, Self.inset.width)
         .frame(height: 44)
         .background {
-            // One lozenge that moves, under the words, which are legible on it and off it.
             GeometryReader { proxy in
-                let segment = (proxy.size.width - 2 * Self.inset.width) / CGFloat(modes.count)
-                let index = CGFloat(modes.firstIndex(of: model.mode) ?? 0)
-                Capsule()
-                    .fill(Theme.chosen)
-                    .frame(width: segment - 2 * Self.inset.width, height: proxy.size.height - 2 * Self.inset.height)
-                    .offset(x: 2 * Self.inset.width + segment * index, y: Self.inset.height)
+                lozenge(in: proxy.size, of: modes).foregroundStyle(Theme.chosen)
             }
         }
+        .overlay {
+            GeometryReader { proxy in
+                HStack(spacing: 0) {
+                    ForEach(modes) { mode in
+                        label(mode).foregroundStyle(Theme.text)
+                    }
+                }
+                .padding(.horizontal, Self.inset.width)
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .mask { lozenge(in: proxy.size, of: modes) }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func label(_ mode: TimerModel.Mode) -> some View {
+        Text(mode.title)
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// One lozenge that moves, under the mode that is on.
+    private func lozenge(in size: CGSize, of modes: [TimerModel.Mode]) -> some View {
+        let segment = (size.width - 2 * Self.inset.width) / CGFloat(modes.count)
+        let index = CGFloat(modes.firstIndex(of: model.mode) ?? 0)
+        return Capsule()
+            .frame(width: segment - 2 * Self.inset.width, height: size.height - 2 * Self.inset.height)
+            .position(x: Self.inset.width + segment * (index + 0.5), y: size.height / 2)
     }
 
     private func pick(_ mode: TimerModel.Mode) {

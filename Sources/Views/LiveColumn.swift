@@ -185,10 +185,11 @@ struct DisplayPill: View {
         let connected = !kinds.isEmpty
         HStack(spacing: 8) {
             ConnectionDot(connected: connected)
-            Text(DisplayCopy.short(kinds))
+            // The old words go at once and the new ones fade in (`KeyTitle`). Fading through
+            // each other they were "Externalscreennected" for most of the change.
+            KeyTitle(DisplayCopy.short(kinds))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(connected ? Theme.text : Theme.secondary)
-                .contentTransition(.opacity)
                 .lineLimit(1)
         }
         .animation(Motion.state, value: kinds)
@@ -295,24 +296,31 @@ private struct Summary: View {
     var body: some View {
         let phase = model.snapshot(at: now).phase
         let summary = summary
-        summary.text
-            .font(.subheadline)
-            .foregroundStyle(Theme.secondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .contentTransition(.opacity)
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .animation(Motion.fade, value: summary.stage)
-            // The operator's eyes are on the stage when these happen: the last stretch is a
-            // tap on the wrist, running out is a proper buzz.
-            .sensoryFeedback(trigger: phase) { _, phase in
-                guard model.isRunning || model.isFinished else { return nil }
-                switch phase {
-                case .normal: return nil
-                case .warning: return .impact(weight: .light)
-                case .overtime: return .warning
-                }
+        // The line ends at the column's edge, so when its end changes ("ends 2:10 AM" to
+        // "paused") all of it moves. Faded from one to the other, the length was on the line
+        // twice, a little apart. So the old line goes at once and the new one fades in, as the
+        // word on a key does. Within a stage (a nudge, the end time a minute on) it is a cut.
+        ZStack {
+            summary.text
+                .font(.subheadline)
+                .foregroundStyle(Theme.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .id(summary.stage)
+                .transition(Motion.swap)
+        }
+        .animation(Motion.state, value: summary.stage)
+        // The operator's eyes are on the stage when these happen: the last stretch is a
+        // tap on the wrist, running out is a proper buzz.
+        .sensoryFeedback(trigger: phase) { _, phase in
+            guard model.isRunning || model.isFinished else { return nil }
+            switch phase {
+            case .normal: return nil
+            case .warning: return .impact(weight: .light)
+            case .overtime: return .warning
             }
+        }
     }
 
     /// The mode is not named here: the switch that sets it says which it is.

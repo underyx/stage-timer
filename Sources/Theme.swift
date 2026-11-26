@@ -202,7 +202,7 @@ struct ChipStyle: ButtonStyle {
     }
 }
 
-/// The word on a key that says something else when the key's state changes.
+/// The word on a key, or any short line, that says something else when its state changes.
 struct KeyTitle: View {
     var text: String
 
