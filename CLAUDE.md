@@ -98,7 +98,15 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   leave a countdown that never notices it ended.
 - **Nothing on the control surface throws a running timer away on one tap.** Reset is held
   (`Transport`), and a new length or mode asks first once a run has started. A new control that
-  calls `reset()`, `setDuration` or sets `mode` needs the same guard.
+  calls `reset()`, `setDuration` or sets `mode` needs the same guard. It asks with an `.alert`,
+  not a `confirmationDialog`: on iOS 26 that is a bubble hanging off the control, and the owner
+  found it read as a tooltip out of place (2026-11-25).
+- **The mode's switch (`ModeSwitch`) is in one of two places, never both**: above the monitor in
+  a tall window, at the top of `SetupPanel` in a wide one (`showsMode`). It was a row in the Setup
+  sheet until the owner did not find it there. A wide window has no header over the monitor.
+- **Gaps between keys are `Theme.keyGap` and `Theme.rowGap`** (12 across, 20 down). At 8 the owner
+  found the keys too densely packed. On a 393 x 852 phone the column and the message card now
+  take 753 of the 759 points there are, so a taller row scrolls the surface.
 - **The control surface is always dark and never follows the system appearance** (`Theme`): it is
   used in dimmed rooms. Colours come from `Theme`, not from system colours or materials.
 - **Liquid Glass is for a key that sits straight on the ground, and only through `KeyStyle`,
@@ -127,7 +135,7 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   the film showed the ink turning on a body that had not moved.
 - **A control must not change size when its state does.** The Black out key has one title and
   lays out both of its icons: when it grew to say "Blacked out", its amber fill arrived outside
-  the margin, and a key held at that width left no room for the line beside it.
+  the margin. It now has a fixed width beside Start, the same as Reset's on the other side.
 - **The nudge keys go through `TimerModel.step`**, which disables animations for the change. They
   repeat while held and, before a start, walk the length across the row of lengths: anything that
   animates on the length would be restarted several times a second. For the same reason a length

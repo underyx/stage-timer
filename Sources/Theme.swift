@@ -15,6 +15,9 @@ enum Theme {
     /// One step up again, for a key on a raised card.
     static let lifted = Color(red: 0.227, green: 0.216, blue: 0.200)
     static let hairline = Color.white.opacity(0.08)
+    /// What lies under the one that is on in a switch, on glass or on a card: lighter than
+    /// either, and not the accent.
+    static let chosen = Color.white.opacity(0.16)
 
     /// Whether keys are Liquid Glass where the system has it. Always true in the app. The
     /// tests turn it off to draw the surface as iOS 17 and 18 have it, which no simulator in CI
@@ -31,6 +34,12 @@ enum Theme {
     static let cardRadius: CGFloat = 26
     /// A card inside a sheet or beside the controls, with rows in it.
     static let groupRadius: CGFloat = 22
+
+    /// The air between two keys in a row, and between two rows of keys. At 8 the owner found the
+    /// keys too densely packed (2026-11-25): glass keys have a soft edge, and at that distance
+    /// two of them read as one shape.
+    static let keyGap: CGFloat = 12
+    static let rowGap: CGFloat = 20
 
     static let text = Color(red: 0.953, green: 0.933, blue: 0.902)
     /// 9:1 on `ground`, 7:1 on `raised`.

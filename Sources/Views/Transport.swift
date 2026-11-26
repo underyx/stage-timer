@@ -1,10 +1,11 @@
 import SwiftUI
 
-/// Start, pause and reset: the row a thumb rests on.
+/// Black out, start or pause, and reset: the row a thumb rests on.
 ///
-/// Reset is the one control here that cannot be taken back, and it sits beside the one pressed
-/// most, so it has to be held. A held key hides its own face under the finger, so the feedback
-/// for the hold is drawn on the Start key next to it, which the finger never covers.
+/// Start is in the middle with a key of the same width on either side. Reset is the one control
+/// here that cannot be taken back, and it sits beside the one pressed most, so it has to be held.
+/// A held key hides its own face under the finger, so the feedback for the hold is drawn on the
+/// Start key next to it, which the finger never covers. Black out is taken back by a second tap.
 struct Transport: View {
     @Environment(TimerModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -17,6 +18,8 @@ struct Transport: View {
     @State private var ticker: Task<Void, Never>?
 
     private static let holdTime = 0.7
+    /// The width of the key on either side of Start.
+    private static let side: CGFloat = 96
 
     /// `holding` draws the row as it is partway through a hold on Reset. Only a screenshot asks
     /// for it: nothing but a finger can hold the key.
@@ -26,7 +29,10 @@ struct Transport: View {
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.keyGap) {
+            BlackoutKey()
+                .frame(width: Self.side)
+
             Button { model.toggle() } label: {
                 Label {
                     KeyTitle(title)
@@ -42,7 +48,7 @@ struct Transport: View {
             .keyboardShortcut(.space, modifiers: [])
 
             resetKey
-                .frame(width: 104)
+                .frame(width: Self.side)
         }
         .frame(height: 64)
         // A firm click to start, a softer one to stop; the same softer one arrives by itself when
@@ -71,12 +77,19 @@ struct Transport: View {
                 Theme.hold.frame(width: geo.size.width * fill)
             }
             .overlay {
-                Text("Keep holding to reset")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .padding(.horizontal, 8)
+                // On one line where the key is wide enough for it (an iPad), on two on a phone,
+                // where the key has a key on either side of it.
+                ViewThatFits(in: .horizontal) {
+                    Text("Keep holding to reset")
+                        .lineLimit(1)
+                    Text("Keep holding\nto reset")
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                }
+                .font(.headline)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
             }
         }
         .clipShape(Capsule())
@@ -150,6 +163,36 @@ struct Transport: View {
     }
 }
 
+/// Takes the timer off the room's screen and puts it back.
+///
+/// The key is as wide lit as not, with one title and both icons laid out and one of them shown.
+/// When it grew to say "Blacked out" its amber arrived outside the margin. The monitor says what
+/// state the screen is in.
+private struct BlackoutKey: View {
+    @Environment(TimerModel.self) private var model
+
+    var body: some View {
+        let on = model.blackout
+        Button { model.blackout.toggle() } label: {
+            VStack(spacing: 3) {
+                ZStack {
+                    Image(systemName: "eye.slash").opacity(on ? 0 : 1)
+                    Image(systemName: "eye.slash.fill").opacity(on ? 1 : 0)
+                }
+                .font(.body.weight(.semibold))
+                Text("Black out")
+                    .font(.footnote.weight(.semibold))
+            }
+        }
+        .buttonStyle(on ? KeyStyle.primary() : KeyStyle(fill: Theme.raised))
+        .animation(Motion.state, value: on)
+        .keyboardShortcut("b", modifiers: [])
+        .sensoryFeedback(.selection, trigger: on)
+        .accessibilityLabel("Black out")
+        .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
 /// Moves the number on the screen: a countdown gets more or less time, a stopwatch has its time
 /// already counted shifted. Holding a key repeats it.
 struct NudgeRow: View {
@@ -173,7 +216,7 @@ struct NudgeRow: View {
     ]
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.keyGap) {
             ForEach(Self.steps) { step in
                 Button {
                     model.step(by: step.seconds)

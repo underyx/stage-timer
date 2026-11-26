@@ -16,7 +16,7 @@ struct MessageCard: View {
         let live = model.showMessage
         let shape = RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
 
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Message").sectionLabel()
                 Spacer()
@@ -43,7 +43,7 @@ struct MessageCard: View {
                 .animation(Motion.fade, value: editing)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     ForEach(Self.presets, id: \.self) { text in
                         Button(text) { model.message = text }
                             .buttonStyle(ChipStyle(fill: Theme.raised, glass: false))

@@ -4,43 +4,42 @@ import SwiftUI
 /// what the room sees, how long it is set for, the transport, the nudges.
 struct LiveColumn: View {
     @Binding var sheet: ControlSheet?
-    /// Tall windows keep Setup in a sheet and need the button; wide ones show it alongside.
-    var showsSetupButton: Bool
-    /// A landscape phone has no height to spare for it.
-    var showsHeader = true
+    /// A tall window opens with the mode and the way into Setup. A wide one has Setup beside the
+    /// column, with the mode at the top of it, and no height to spare on a phone.
+    var showsHeader: Bool
     @State private var echo = NudgeEcho()
 
     var body: some View {
         VStack(spacing: 0) {
             if showsHeader {
-                header.padding(.bottom, 8)
+                header.padding(.bottom, 12)
             }
             // The monitor is the one flexible thing in the column: in a window too short for
             // everything it gives up height (and, staying 16:9, width) before any key does.
             Monitor(echo: echo)
                 .layoutPriority(-1)
-            StatusStrip()
+            Caption()
             LengthRow(sheet: $sheet)
-                .padding(.bottom, 12)
+                .padding(.bottom, Theme.rowGap)
             Transport()
-                .padding(.bottom, 8)
+                .padding(.bottom, Theme.rowGap)
             NudgeRow { echo.add($0) }
         }
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            DisplayPill()
-            Spacer(minLength: 0)
-            if showsSetupButton {
-                Button { sheet = .setup } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.body.weight(.semibold))
-                }
-                .buttonStyle(KeyStyle())
-                .frame(width: 44, height: 44)
-                .accessibilityLabel("Setup")
+        HStack(spacing: 0) {
+            // On an iPad on its end the column is 640 wide, and two words do not need it all.
+            ModeSwitch()
+                .frame(maxWidth: 400)
+            Spacer(minLength: Theme.keyGap)
+            Button { sheet = .setup } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.body.weight(.semibold))
             }
+            .buttonStyle(KeyStyle())
+            .frame(width: 44, height: 44)
+            .accessibilityLabel("Setup")
         }
         .frame(height: 44)
     }
@@ -198,7 +197,8 @@ struct DisplayPill: View {
         .sensoryFeedback(trigger: connected) { _, connected in
             connected ? .success : .warning
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(DisplayCopy.title(kinds))
     }
 }
 
@@ -231,11 +231,14 @@ struct ConnectionDot: View {
 
 /// The words for what is connected, in one place for the pill and the Setup card.
 enum DisplayCopy {
+    /// For the pill, which shares its line with what the timer is set to: on a phone the two
+    /// have 361 points between them, and "On the external screen" left a countdown that had run
+    /// over no room to say since when.
     static func short(_ kinds: Set<DisplayKind>) -> String {
         switch (kinds.contains(.external), kinds.contains(.window)) {
-        case (true, true): "On the external screen and a window"
-        case (true, false): "On the external screen"
-        case (false, true): "Display window open"
+        case (true, true): "Screen and a window"
+        case (true, false): "External screen"
+        case (false, true): "Display window"
         case (false, false): "No display connected"
         }
     }
@@ -263,19 +266,23 @@ enum DisplayCopy {
     }
 }
 
-// MARK: - Status strip
+// MARK: - Caption
 
-/// One line on what the timer is set to and when it will be done, and the blackout key.
-private struct StatusStrip: View {
+/// The line under the monitor: whether anyone can see the timer, and what it is set to and when
+/// it will be done. Words only; the keys start under it.
+private struct Caption: View {
     var body: some View {
         HStack(spacing: 12) {
+            // The pill keeps its words whole and the other side makes do with what is left.
+            DisplayPill()
+                .fixedSize()
+                .layoutPriority(1)
             // Once a second is all an end time needs.
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 Summary(now: context.date)
             }
-            BlackoutButton()
         }
-        .frame(height: 52)
+        .frame(height: 40)
     }
 }
 
@@ -294,7 +301,7 @@ private struct Summary: View {
             .lineLimit(1)
             .minimumScaleFactor(0.75)
             .contentTransition(.opacity)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .trailing)
             .animation(Motion.fade, value: summary.stage)
             // The operator's eyes are on the stage when these happen: the last stretch is a
             // tap on the wrist, running out is a proper buzz.
@@ -308,14 +315,15 @@ private struct Summary: View {
             }
     }
 
+    /// The mode is not named here: the switch that sets it says which it is.
     private var summary: (text: Text, stage: Stage) {
         let elapsed = model.elapsed(at: now)
         switch model.mode {
         case .stopwatch:
             if model.isRunning {
-                return (Text("Stopwatch · started \(Self.clock(now.addingTimeInterval(-elapsed)))"), .running)
+                return (Text("Started \(Self.clock(now.addingTimeInterval(-elapsed)))"), .running)
             }
-            return model.isPristine ? (Text("Stopwatch"), .ready) : (Text("Stopwatch · paused"), .paused)
+            return model.isPristine ? (Text("Counts up"), .ready) : (Text("Paused"), .paused)
         case .countdown:
             let length = Text(TimerModel.format(Int(model.duration)))
                 .fontWeight(.semibold)
@@ -326,52 +334,25 @@ private struct Summary: View {
             let remaining = model.target - elapsed
             if model.isPristine {
                 let amber = model.warnAt > 0 ? " · amber at \(TimerModel.format(Int(model.warnAt)))" : ""
-                return (Text("Countdown \(length)\(amber)"), .ready)
+                return (Text("\(length)\(amber)"), .ready)
             }
             if model.isFinished {
-                return (Text("Countdown \(length)\(extra) · finished"), .finished)
+                return (Text("\(length)\(extra) · finished"), .finished)
             }
             if !model.isRunning {
-                return (Text("Countdown \(length)\(extra) · paused"), .paused)
+                return (Text("\(length)\(extra) · paused"), .paused)
             }
             let end = Self.clock(now.addingTimeInterval(remaining))
             if remaining > 0 {
-                return (Text("Countdown \(length)\(extra) · ends \(end)"), .running)
+                return (Text("\(length)\(extra) · ends \(end)"), .running)
             }
             let over = Text("over since \(end)").fontWeight(.semibold).foregroundStyle(Theme.alert)
-            return (Text("Countdown \(length)\(extra) · \(over)"), .over)
+            return (Text("\(length)\(extra) · \(over)"), .over)
         }
     }
 
     private static func clock(_ date: Date) -> String {
         date.formatted(date: .omitted, time: .shortened)
-    }
-}
-
-private struct BlackoutButton: View {
-    @Environment(TimerModel.self) private var model
-
-    var body: some View {
-        Button { model.blackout.toggle() } label: {
-            // One title, and both icons laid out with one of them shown, so the key is exactly
-            // as wide lit as not. When it grew to say "Blacked out" its amber arrived outside
-            // the margin, and the line beside it lost the room for "over since 12:16 AM". The
-            // monitor above says what state the screen is in.
-            Label {
-                Text("Black out")
-            } icon: {
-                ZStack {
-                    Image(systemName: "eye.slash").opacity(model.blackout ? 0 : 1)
-                    Image(systemName: "eye.slash.fill").opacity(model.blackout ? 1 : 0)
-                }
-            }
-            .fontWeight(.semibold)
-        }
-        .buttonStyle(ChipStyle(selected: model.blackout))
-        .animation(Motion.fade, value: model.blackout)
-        .keyboardShortcut("b", modifiers: [])
-        .sensoryFeedback(.selection, trigger: model.blackout)
-        .accessibilityAddTraits(model.blackout ? .isSelected : [])
     }
 }
 
@@ -392,7 +373,7 @@ private struct LengthRow: View {
         Group {
             switch model.mode {
             case .countdown:
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.keyGap) {
                     // Side by side where they fit (an iPad), a strip to swipe where they do not.
                     ViewThatFits(in: .horizontal) {
                         track(flexible: true)
@@ -435,11 +416,12 @@ private struct LengthRow: View {
             }
         }
         .frame(height: 44)
-        // A new length starts the timer over, which mid-talk is never what a stray tap meant.
-        .confirmationDialog(
+        // A new length starts the timer over, which mid-talk is never what a stray tap meant. It
+        // asks with an alert in the middle of the screen: a confirmation dialog is, on iOS 26, a
+        // bubble hanging off the row, and it read as a tooltip.
+        .alert(
             "Start over?",
             isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } }),
-            titleVisibility: .visible,
             presenting: pending
         ) { seconds in
             Button("Reset to \(TimerModel.format(Int(seconds)))", role: .destructive) {
@@ -593,8 +575,8 @@ private struct ChosenBounds: PreferenceKey {
     }
 }
 
-/// A key in the track: no body of its own, only a light under the finger.
-private struct SegmentStyle: ButtonStyle {
+/// A key in a track (the lengths, the mode): no body of its own, only a light under the finger.
+struct SegmentStyle: ButtonStyle {
     var inset: CGSize
 
     func makeBody(configuration: Configuration) -> some View {

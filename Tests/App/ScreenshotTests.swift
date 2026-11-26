@@ -69,7 +69,8 @@ struct ScreenshotTests {
     }
 
     /// Setup is a sheet on a phone, and a test has no finger to raise it with: this is the
-    /// sheet's content on the sheet's colours.
+    /// sheet's content on the sheet's colours. The mode is not in it: a phone has that above
+    /// the monitor.
     @Test func phoneSetup() async throws {
         let panels: [(name: String, mode: TimerModel.Mode)] = [
             ("phone-9-setup-countdown", .countdown), ("phone-9-setup-stopwatch", .stopwatch),
@@ -112,6 +113,21 @@ struct ScreenshotTests {
                 DurationPicker(title: "Adjust stopwatch", relative: true, initial: 0) { _ in }
             }
         try await shootWindow("window-elapsed-sheet", elapsed)
+    }
+
+    /// What a new mode asks once a run has started is the system's alert, put up over the whole
+    /// window like a sheet. The switch that asks is the real one, unseen, laid over the surface
+    /// as if Stopwatch had been tapped.
+    @Test func askingBeforeAReset() async throws {
+        let model = timer(length: 20 * 60, elapsed: 7 * 60 + 25.5)
+        let asking = ControlView()
+            .overlay {
+                ModeSwitch(fill: .clear, asking: .stopwatch)
+                    .opacity(0)
+                    .allowsHitTesting(false)
+            }
+            .environment(model)
+        try await shootWindow("window-mode-alert", asking)
     }
 
     /// iOS 17 and 18 have no Liquid Glass and get flat keys of the same shapes. No simulator in
@@ -221,10 +237,11 @@ struct ScreenshotTests {
     /// A film of a view with glass in it is of the part of the view that fits the simulator's
     /// screen (`picture`), so that no frame waits for the view to be moved: the top of a phone
     /// unless it says otherwise. These are the bottom of a phone, for the message card, and two
-    /// stretches of the rows of keys under an iPad's monitor: 2m to 20m, and the Black out key.
+    /// stretches of the rows of keys under an iPad's monitor: 2m to 20m, and the left end of the
+    /// rows, where the Black out key is.
     private static let phoneFoot = CGRect(x: 0, y: 104, width: 393, height: 748)
-    private static let tabletLengths = CGRect(x: 110, y: 430, width: 354, height: 280)
-    private static let tabletBlackout = CGRect(x: 340, y: 430, width: 354, height: 280)
+    private static let tabletLengths = CGRect(x: 110, y: 426, width: 354, height: 236)
+    private static let tabletBlackout = CGRect(x: 0, y: 426, width: 354, height: 236)
 
     @Test func choosingALength() async throws {
         let short = timer(length: 60)
@@ -299,6 +316,10 @@ struct ScreenshotTests {
             model.displayConnected(id: "shot", kind: .external)
         }
         try await film("mode-to-stopwatch", .phone, ControlView().environment(model)) { model.mode = .stopwatch }
+        try await film("mode-to-countdown", .phone, ControlView().environment(model)) { model.mode = .countdown }
+        // Beside the controls the switch is a flat track among the cards, so the glass does not matter.
+        let wide = timer()
+        try await film("ipad-mode-to-stopwatch", Device.tabletLandscape.plain, ControlView().environment(wide)) { wide.mode = .stopwatch }
         let pad = timer(elapsed: 30.5)
         try await film("ipad-clock-on", Device.tabletLandscape.plain, ControlView().environment(pad)) { pad.showClock = true }
     }
@@ -355,8 +376,9 @@ private struct Device {
     var glass = true
 
     /// Where the control surface's glass keys are at this size, for a size whose monitor would
-    /// not fit one piece of a picture (`picture`). Measured off a picture; move a key out of
-    /// them and it is drawn as glass is off the screen, which is wrongly.
+    /// not fit one piece of a picture (`picture`): the rows under the monitor and, in a tall
+    /// window, the header over it. Worked out from the layout and checked against a picture;
+    /// move a key out of them and it is drawn as glass is off the screen, which is wrongly.
     var keys: [CGRect]?
 
     /// The same size for a view, or a film, in which the glass does not matter.
@@ -369,27 +391,27 @@ private struct Device {
     static let phone = Device(size: CGSize(width: 393, height: 852), safeArea: EdgeInsets(top: 59, leading: 0, bottom: 34, trailing: 0))
     static let phoneLandscape = Device(
         size: CGSize(width: 852, height: 393), safeArea: EdgeInsets(top: 0, leading: 59, bottom: 21, trailing: 59),
-        keys: [CGRect(x: 60, y: 290, width: 440, height: 103)]
+        keys: [CGRect(x: 60, y: 156, width: 440, height: 237)]
     )
     static let smallPhone = Device(size: CGSize(width: 375, height: 667), safeArea: EdgeInsets(top: 20, leading: 0, bottom: 0, trailing: 0))
     static let tabletLandscape = Device(
         size: CGSize(width: 1180, height: 820), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1,
-        keys: [CGRect(x: 0, y: 430, width: 708, height: 280)]
+        keys: [CGRect(x: 0, y: 426, width: 708, height: 236)]
     )
     static let tabletPortrait = Device(
         size: CGSize(width: 820, height: 1180), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 1,
-        keys: [CGRect(x: 640, y: 20, width: 100, height: 52), CGRect(x: 80, y: 432, width: 660, height: 240)]
+        keys: [CGRect(x: 80, y: 14, width: 660, height: 64), CGRect(x: 80, y: 460, width: 660, height: 236)]
     )
     static let screen = Device(size: CGSize(width: 1280, height: 720), scale: 1, glass: false)
     /// 1320 x 2868, the 6.9 inch iPhone.
     static let storePhone = Device(
         size: CGSize(width: 440, height: 956), safeArea: EdgeInsets(top: 62, leading: 0, bottom: 34, trailing: 0), scale: 3,
-        keys: [CGRect(x: 360, y: 66, width: 80, height: 60), CGRect(x: 0, y: 354, width: 440, height: 240)]
+        keys: [CGRect(x: 0, y: 54, width: 440, height: 58), CGRect(x: 0, y: 372, width: 440, height: 228)]
     )
     /// 2752 x 2064, the 13 inch iPad on its side.
     static let storeTablet = Device(
         size: CGSize(width: 1376, height: 1032), safeArea: EdgeInsets(top: 24, leading: 0, bottom: 20, trailing: 0), scale: 2,
-        keys: [CGRect(x: 0, y: 518, width: 826, height: 250)]
+        keys: [CGRect(x: 0, y: 492, width: 826, height: 236)]
     )
 }
 

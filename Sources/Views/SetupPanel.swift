@@ -1,35 +1,24 @@
 import SwiftUI
 
-/// What is decided before a talk rather than during one: the mode, how the countdown behaves,
-/// what else the screen shows, and the connection. A sheet when the window is tall, a column
-/// beside the controls when it is wide.
+/// What is decided before a talk rather than during one: how the countdown behaves, what else
+/// the screen shows, and the connection. A sheet when the window is tall, a column beside the
+/// controls when it is wide.
 struct SetupPanel: View {
     @Environment(TimerModel.self) private var model
+    /// The mode's switch, for the column beside the controls. A tall window has it above the
+    /// monitor instead, and it is never in both places.
+    var showsMode = false
     /// What the cards are filled with; it depends on what the panel sits on.
     var cardFill: Color
     /// The key colour one step up from `cardFill`.
     var keyFill: Color
     var open: (ControlSheet) -> Void
-    @State private var pendingMode: TimerModel.Mode?
 
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 18) {
-            Picker("Mode", selection: mode) {
-                ForEach(TimerModel.Mode.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            // Changing mode starts the timer over, so mid-run it asks first.
-            .confirmationDialog(
-                "Switch mode?",
-                isPresented: Binding(get: { pendingMode != nil }, set: { if !$0 { pendingMode = nil } }),
-                titleVisibility: .visible,
-                presenting: pendingMode
-            ) { mode in
-                Button("Reset and switch to \(mode.title)", role: .destructive) { model.mode = mode }
-                Button("Keep going", role: .cancel) {}
-            } message: { _ in
-                Text("The timer has already started. Switching mode resets it.")
+            if showsMode {
+                ModeSwitch(fill: cardFill)
             }
 
             // A stopwatch has nothing to decide beforehand. Shifting its time is done mid-talk and
@@ -79,15 +68,6 @@ struct SetupPanel: View {
             ConnectionCard(fill: cardFill, keyFill: keyFill)
         }
         .tint(Theme.amber)
-    }
-
-    private var mode: Binding<TimerModel.Mode> {
-        Binding {
-            model.mode
-        } set: { new in
-            guard new != model.mode else { return }
-            if model.isPristine { model.mode = new } else { pendingMode = new }
-        }
     }
 }
 
