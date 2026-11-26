@@ -21,6 +21,12 @@ enum Theme {
     /// runs. Unsafe by the compiler's lights only: nothing but a test writes it.
     nonisolated(unsafe) static var glass = true
 
+    /// Whether a key that asks for glass is drawn as glass here.
+    static func draws(glass wanted: Bool) -> Bool {
+        if #available(iOS 26.0, *) { return wanted && glass }
+        return false
+    }
+
     /// The corners of a card, and of the monitor. Keys are capsules and have none to choose.
     static let cardRadius: CGFloat = 26
     /// A card inside a sheet or beside the controls, with rows in it.
@@ -63,11 +69,15 @@ enum Motion {
     /// Something changing what it is: Start becoming Pause, a card going live.
     static var state: Animation { paced(.spring(duration: 0.42, bounce: 0.16)) }
     static var fade: Animation { paced(.easeInOut(duration: 0.3)) }
-    /// The words on a key whose body is turning amber or back. Dark words read only on amber and
-    /// light ones only on the dark, so they do not fade from one to the other, which passes
-    /// through a grey that cannot be read on a key half way to amber: they change at a stroke,
-    /// about when the body is half way (on glass, a fifth of a second in).
-    static var ink: Animation { paced(.linear(duration: 0.02).delay(0.18)) }
+    /// How long the words on a key keep their ink once the body under them has begun to turn
+    /// amber, or to turn back (`View.ink`). Light words read on the dark and on the brown half way,
+    /// dark ones only on amber: so the words go dark once the body is most of the way to amber and
+    /// go light as soon as it has left it. Glass takes a tint more slowly than a fill takes a
+    /// colour (it was half way a quarter of a second in, in the films), hence the two pairs.
+    static func inkHold(dark: Bool, glass: Bool) -> Duration {
+        let seconds = glass ? (dark ? 0.28 : 0.16) : (dark ? 0.14 : 0.07)
+        return .seconds(seconds * slowdown)
+    }
 
     /// One word taking another's place: the old one is gone before the new one arrives. Two
     /// words fading through each other in the same place are neither of them for a moment, and
@@ -125,9 +135,7 @@ struct KeyStyle: ButtonStyle {
                 .minimumScaleFactor(0.7)
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                // Only the colour takes this curve; what else changes in the label keeps the
-                // animation it was changed with.
-                .animation(Motion.ink) { $0.foregroundStyle(style.ink) }
+                .ink(style.ink, glass: Theme.draws(glass: style.glass))
             if #available(iOS 26.0, *) {
                 if style.glass && Theme.glass {
                     // The glass answers a finger itself, so nothing is drawn here for a press.
@@ -167,7 +175,7 @@ struct ChipStyle: ButtonStyle {
         let label = configuration.label
             .font(.subheadline.weight(.semibold))
             .lineLimit(1)
-            .animation(Motion.ink) { $0.foregroundStyle(selected ? Theme.onAmber : Theme.text) }
+            .ink(selected ? Theme.onAmber : Theme.text, glass: Theme.draws(glass: glass))
             .padding(.horizontal, 16)
             .frame(minWidth: 50, minHeight: 44)
         if #available(iOS 26.0, *) {
@@ -202,7 +210,10 @@ struct KeyTitle: View {
     }
 
     var body: some View {
-        ZStack {
+        // The word that is leaving is not counted in the width, so the icon beside it is already
+        // where the new word wants it. Kept to its leading edge the old word stays clear of the
+        // icon; centred, the longer of two words lay over it while it left.
+        ZStack(alignment: .leading) {
             Text(text)
                 .id(text)
                 .transition(Motion.swap)
@@ -211,7 +222,46 @@ struct KeyTitle: View {
     }
 }
 
+/// The ink of a key whose body turns amber and back: light on the dark, dark on amber.
+///
+/// The ink never fades from one to the other. Half way there it is a grey, on a body that is
+/// half way to amber, and the word cannot be read; and an animation scoped to the foreground
+/// style did not reach the words, which faded with the body whatever it said. So the ink that is
+/// drawn is kept here and changed at a stroke, outside any animation, once the body has changed
+/// enough for the new ink to be read on it (`Motion.inkHold`).
+private struct Ink: ViewModifier {
+    var ink: Color
+    var glass: Bool
+    @State private var drawn: Color
+    @State private var change: Task<Void, Never>?
+
+    init(_ ink: Color, glass: Bool) {
+        self.ink = ink
+        self.glass = glass
+        _drawn = State(initialValue: ink)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .foregroundStyle(drawn)
+            .onChange(of: ink) { _, ink in
+                change?.cancel()
+                let hold = Motion.inkHold(dark: ink == Theme.onAmber, glass: glass)
+                change = Task {
+                    try? await Task.sleep(for: hold)
+                    guard !Task.isCancelled else { return }
+                    drawn = ink
+                }
+            }
+    }
+}
+
 extension View {
+    /// The ink of a key's words, changed at a stroke when the key's state changes (`Ink`).
+    func ink(_ ink: Color, glass: Bool) -> some View {
+        modifier(Ink(ink, glass: glass))
+    }
+
     /// The body of something that is not a `Button` but sits on the ground like a key: Liquid
     /// Glass where the system has it, the flat fill before that. `lit` floods it with a colour
     /// (Reset while it is held); the colour is drawn in the glass, not as a tint of it, so that

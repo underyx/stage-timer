@@ -283,9 +283,9 @@ struct ScreenshotTests {
     /// be put up before filming starts, so each timer is started well short of its moment.
     @Test func runningOut() async throws {
         let amber = timer(elapsed: 4 * 60 - 3.5)
-        try await film("into-the-last-minute", .phone, ControlView().environment(amber), for: .seconds(6)) {}
+        try await film("into-the-last-minute", .phone, ControlView().environment(amber), for: .seconds(6), slowed: slowdown) {}
         let red = timer(elapsed: 5 * 60 - 3.5)
-        try await film("into-overtime", .phone, ControlView().environment(red), for: .seconds(6)) {}
+        try await film("into-overtime", .phone, ControlView().environment(red), for: .seconds(6), slowed: slowdown) {}
         let room = timer(elapsed: 5 * 60 - 3.5)
         try await film("screen-into-overtime", .screen, DisplayView().environment(room), for: .seconds(6)) {}
         // 10:00 is one digit wider than the 9:59 that follows it a second after the start.
@@ -627,15 +627,18 @@ private struct StoreChrome<Content: View>: View {
     }
 }
 
-/// How much slower than life a film is taken. A frame takes the simulator in CI about an eighth
-/// of a second to draw, so at full speed a third-of-a-second glide is two frames; slowed, the
-/// same curve is a dozen.
+/// How much slower than life a film is taken. A frame of a view with no glass in it takes the
+/// simulator in CI about an eighth of a second to draw, so at full speed a third-of-a-second
+/// glide is two frames; slowed, the same curve is a dozen. A frame with glass in it takes about
+/// half a second, so those films are slowed twice as much again and run longer.
 private let slowdown = 4.0
+private let glassSlowdown = 8.0
 
 /// Films a change: the view is put up, `change` is made, and a frame is kept as often as one
 /// can be drawn until `length` has passed. The frames go to `motion/<name>/`, each named for the
-/// milliseconds since the change (divide by `slowdown` for the app's own time), after one of
-/// how it stood before.
+/// milliseconds since the change (divide by the slowdown for the app's own time: 8 for a view
+/// with glass in it unless the film says otherwise, 4 for the rest), after one of how it stood
+/// before.
 ///
 /// The change is made on the model, as a key's action makes it. What a finger adds (a key going
 /// down under it, a hold) is not in these, and neither is anything the system animates at its
@@ -646,19 +649,22 @@ private func film(
     _ device: Device,
     _ view: some View,
     part: CGRect? = nil,
-    for length: Duration = .milliseconds(3200),
+    for length: Duration? = nil,
+    slowed: Double? = nil,
     _ change: @MainActor () -> Void
 ) async throws {
     let (window, canvas) = try await mount(device, view)
     let part = part ?? firstPart(of: canvas, device)
-    Motion.slowdown = slowdown
+    let pace = slowed ?? (device.glass ? glassSlowdown : slowdown)
+    let filmed = length ?? .milliseconds(pace > slowdown ? 5200 : 3200)
+    Motion.slowdown = pace
     defer { Motion.slowdown = 1 }
     var frames = [(name: String, image: UIImage)]()
     frames.append(("0000-before", await picture(of: canvas, device, part: part)))
     let clock = ContinuousClock()
     let start = clock.now
     change()
-    while clock.now - start < length {
+    while clock.now - start < filmed {
         // Gives the main thread back, so the next frame of the animation is worked out.
         try await Task.sleep(for: .milliseconds(12))
         let passed = (clock.now - start).components

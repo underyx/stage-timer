@@ -55,7 +55,8 @@ to a view, and add a shot for a new state.
 
 **A change that animates is filmed, and the film is read before it ships.** The same tests make one
 change on a mounted view and keep the frames while it settles, in `build/screenshots/motion/<name>/`
-(file names are milliseconds since the change, at a quarter of the app's speed: `Motion.slowdown`).
+(file names are milliseconds since the change, at a quarter of the app's speed and an eighth for a
+view with glass in it, which takes four times as long to draw: `Motion.slowdown`).
 Build 1.2 (9) went to TestFlight on stills alone, and the owner found three animation glitches in
 ten minutes, each between two stills that looked right. Add a film for anything new that moves. An
 animation that does not come from `Motion` (use `Motion.paced` for a one-off) is not slowed and is
@@ -117,10 +118,11 @@ scene code or `LockKeepalive` is unverified until someone runs it on hardware, w
   as state and starts the fade with `withAnimation` from `onChange`. Amber to red at zero is no
   animation at all but a blend by the time past zero: an animation under the overtime pulse,
   which changes the colour every tick, sent the digits through cyan and green.
-- **Words that change on a key go through `KeyTitle`, and a key's ink through `Motion.ink`.** Two
-  titles cross-fading in one place were neither for a third of the change, and ink fading along
-  with a body that turns amber is grey on brown halfway. The old word leaves first; the ink
-  changes at a stroke, mid-change.
+- **Words that change on a key go through `KeyTitle`, and a key's ink through `View.ink`.** Two
+  titles cross-fading in one place were neither for a third of the change, so the old word leaves
+  first. Ink fading along with a body that turns amber is grey on brown halfway, and an animation
+  scoped to the foreground style did not stop it: the ink drawn is state, changed at a stroke once
+  the body has turned far enough for it to be read (`Motion.inkHold`).
 - **A control must not change size when its state does.** The Black out key has one title and
   lays out both of its icons: when it grew to say "Blacked out", its amber fill arrived outside
   the margin, and a key held at that width left no room for the line beside it.
