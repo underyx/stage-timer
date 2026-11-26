@@ -14,7 +14,12 @@ import UIKit
 ///
 /// The sizes are the devices', not the simulator's: the views lay themselves out from the size
 /// they are given, so an iPad is drawn in a window that large on whatever phone the tests run on.
+///
+/// A still cannot show a highlight sliding the wrong way, so the changes that animate are filmed
+/// too: `build/screenshots/motion/` has a folder of frames for each. One at a time, because a
+/// film is only as even as the main thread is free.
 @MainActor
+@Suite(.serialized)
 struct ScreenshotTests {
     // MARK: The control surface on a phone
 
@@ -144,6 +149,80 @@ struct ScreenshotTests {
         }
         try await shoot("screen-5-four-by-three", Device(size: CGSize(width: 1024, height: 768), scale: 1), DisplayView().environment(narrow))
     }
+
+    // MARK: How it moves
+
+    @Test func choosingALength() async throws {
+        let short = timer(length: 60)
+        try await film("length-1m-to-10m", .phone, ControlView().environment(short)) { short.setDuration(10 * 60) }
+        let near = timer()
+        try await film("length-5m-to-3m", .phone, ControlView().environment(near)) { near.setDuration(3 * 60) }
+        let far = timer()
+        try await film("ipad-length-5m-to-20m", .tabletLandscape, ControlView().environment(far)) { far.setDuration(20 * 60) }
+    }
+
+    /// Before a start the nudge keys edit the length itself, on and off the lengths in the row.
+    @Test func steppingTheLength() async throws {
+        let off = timer()
+        try await film("step-5m-plus-10s", .phone, ControlView().environment(off)) { off.adjust(by: 10) }
+        let on = timer(length: 9 * 60)
+        try await film("step-9m-plus-1min", .phone, ControlView().environment(on)) { on.adjust(by: 60) }
+        let pad = timer()
+        try await film("ipad-step-5m-plus-10s", .tabletLandscape, ControlView().environment(pad)) { pad.adjust(by: 10) }
+        let back = timer(length: 5 * 60 + 10)
+        try await film("ipad-step-back-onto-5m", .tabletLandscape, ControlView().environment(back)) { back.adjust(by: -10) }
+    }
+
+    @Test func blackingOut() async throws {
+        let model = timer(elapsed: 30.5)
+        try await film("blackout-on", .phone, ControlView().environment(model)) { model.blackout = true }
+        try await film("blackout-off", .phone, ControlView().environment(model)) { model.blackout = false }
+        let pad = timer(elapsed: 30.5)
+        try await film("ipad-blackout-on", .tabletLandscape, ControlView().environment(pad)) { pad.blackout = true }
+        let room = timer(elapsed: 30.5)
+        try await film("screen-blackout-on", .screen, DisplayView().environment(room)) { room.blackout = true }
+    }
+
+    @Test func showingAMessage() async throws {
+        let model = timer(elapsed: 30.5) { $0.message = "Wrap up" }
+        try await film("message-on", .phone, ControlView().environment(model)) { model.showMessage = true }
+        try await film("message-off", .phone, ControlView().environment(model)) { model.showMessage = false }
+        let room = timer(length: 20 * 60, elapsed: 30.5) { $0.message = "5 minutes left" }
+        try await film("screen-message-on", .screen, DisplayView().environment(room)) { room.showMessage = true }
+        try await film("screen-message-off", .screen, DisplayView().environment(room)) { room.showMessage = false }
+    }
+
+    @Test func startingAndStopping() async throws {
+        let model = timer()
+        try await film("start", .phone, ControlView().environment(model)) { model.start() }
+        try await film("pause", .phone, ControlView().environment(model)) { model.pause() }
+        try await film("resume", .phone, ControlView().environment(model)) { model.start() }
+        try await film("reset", .phone, ControlView().environment(model)) { model.reset() }
+    }
+
+    /// The two moments the display changes colour by itself. Each is about half a second into
+    /// its film: a view takes most of a second to be put up before filming starts.
+    @Test func runningOut() async throws {
+        let amber = timer(elapsed: 4 * 60 - 1.5)
+        try await film("into-the-last-minute", .phone, ControlView().environment(amber), for: .seconds(2)) {}
+        let red = timer(elapsed: 5 * 60 - 1.5)
+        try await film("into-overtime", .phone, ControlView().environment(red), for: .seconds(2)) {}
+        let room = timer(elapsed: 5 * 60 - 1.5)
+        try await film("screen-into-overtime", .screen, DisplayView().environment(room), for: .seconds(2)) {}
+        // 10:00 is one digit wider than the 9:59 that follows it a second after the start.
+        let tens = timer(length: 10 * 60)
+        try await film("screen-ten-minutes-to-nine", .screen, DisplayView().environment(tens), for: .seconds(2)) { tens.start() }
+    }
+
+    @Test func settingUp() async throws {
+        let model = timer()
+        try await film("display-connects", .phone, ControlView().environment(model)) {
+            model.displayConnected(id: "shot", kind: .external)
+        }
+        try await film("mode-to-stopwatch", .phone, ControlView().environment(model)) { model.mode = .stopwatch }
+        let pad = timer(elapsed: 30.5)
+        try await film("ipad-clock-on", .tabletLandscape, ControlView().environment(pad)) { pad.showClock = true }
+    }
 }
 
 // MARK: - A timer in a given state
@@ -217,15 +296,16 @@ private func activeScene() async throws -> UIWindowScene {
     return try #require(scenes.first, "the app has no window scene to draw in")
 }
 
+/// How far inside its window a view is drawn. The simulator's own status bar and home bar would
+/// otherwise push every size about, an iPad's and a projector's included, and blur the top of
+/// whatever scrolls. So the view is drawn well inside a larger window, where no part of it is
+/// under them, and is given the device's safe area instead.
+private let margin: CGFloat = 120
+
+/// Puts a view up in a window of the device's size and waits for it to settle.
 @MainActor
-private func shoot(_ name: String, _ device: Device, _ view: some View) async throws {
+private func mount(_ device: Device, _ view: some View) async throws -> (window: UIWindow, canvas: UIView) {
     let scene = try await activeScene()
-    // The simulator's own status bar and home bar would otherwise push every size about, an
-    // iPad's and a projector's included, and blur the top of whatever scrolls. So the view is
-    // drawn well inside a larger window, where no part of it is under them, and is given the
-    // device's safe area instead.
-    let margin: CGFloat = 120
-    let frame = CGRect(origin: CGPoint(x: margin, y: margin), size: device.size)
     let window = UIWindow(windowScene: scene)
     window.frame = CGRect(origin: .zero, size: CGSize(width: device.size.width + 2 * margin, height: device.size.height + 2 * margin))
     window.backgroundColor = .black
@@ -239,25 +319,78 @@ private func shoot(_ name: String, _ device: Device, _ view: some View) async th
     host.didMove(toParent: root)
     window.rootViewController = root
     window.isHidden = false
-    host.view.frame = frame
+    host.view.frame = CGRect(origin: CGPoint(x: margin, y: margin), size: device.size)
     window.layoutIfNeeded()
     // Long enough for what animates in on appearing (the connection ring, the message card).
     try await Task.sleep(for: .milliseconds(900))
+    return (window, host.view)
+}
 
+@MainActor
+private func picture(of canvas: UIView, _ device: Device) -> UIImage {
     let format = UIGraphicsImageRendererFormat()
     format.scale = device.scale
     format.opaque = true
     let bounds = CGRect(origin: .zero, size: device.size)
-    host.view.frame = frame
-    let image = UIGraphicsImageRenderer(bounds: bounds, format: format).image { _ in
-        host.view.drawHierarchy(in: bounds, afterScreenUpdates: true)
+    canvas.frame = CGRect(origin: CGPoint(x: margin, y: margin), size: device.size)
+    return UIGraphicsImageRenderer(bounds: bounds, format: format).image { _ in
+        canvas.drawHierarchy(in: bounds, afterScreenUpdates: true)
     }
+}
+
+@MainActor
+private func strike(_ window: UIWindow) {
     window.isHidden = true
     window.rootViewController = nil
+}
+
+@MainActor
+private func shoot(_ name: String, _ device: Device, _ view: some View) async throws {
+    let (window, canvas) = try await mount(device, view)
+    let image = picture(of: canvas, device)
+    strike(window)
 
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let png = try #require(image.pngData())
     try png.write(to: folder.appendingPathComponent(name + ".png"))
+}
+
+/// Films a change: the view is put up, `change` is made, and a frame is kept as often as one
+/// can be drawn until `length` has passed. The frames go to `motion/<name>/`, each named for the
+/// milliseconds since the change, after one of how it stood before.
+///
+/// The change is made on the model, as a key's action makes it. What a finger adds (a key going
+/// down under it, a hold) is not in these.
+@MainActor
+private func film(
+    _ name: String,
+    _ device: Device,
+    _ view: some View,
+    for length: Duration = .milliseconds(1100),
+    _ change: @MainActor () -> Void
+) async throws {
+    let (window, canvas) = try await mount(device, view)
+    var frames = [(name: String, image: UIImage)]()
+    frames.append(("0000-before", picture(of: canvas, device)))
+    let clock = ContinuousClock()
+    let start = clock.now
+    change()
+    while clock.now - start < length {
+        // Gives the main thread back, so the next frame of the animation is worked out.
+        try await Task.sleep(for: .milliseconds(12))
+        let passed = (clock.now - start).components
+        let milliseconds = Int(passed.seconds) * 1000 + Int(passed.attoseconds / 1_000_000_000_000_000)
+        frames.append((String(format: "%04d", milliseconds), picture(of: canvas, device)))
+    }
+    strike(window)
+
+    let reel = folder.appendingPathComponent("motion/" + name, isDirectory: true)
+    try? FileManager.default.removeItem(at: reel)
+    try FileManager.default.createDirectory(at: reel, withIntermediateDirectories: true)
+    for frame in frames {
+        let jpeg = try #require(frame.image.jpegData(compressionQuality: 0.85))
+        try jpeg.write(to: reel.appendingPathComponent(frame.name + ".jpg"))
+    }
 }
 
 #endif
