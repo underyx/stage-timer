@@ -10,8 +10,9 @@ enum ControlSheet: String, Identifiable {
 ///
 /// It is split by when a control is used, not by what it controls. What is touched during a talk
 /// (the transport, the nudges, the message, blackout) is always on screen and large; what is
-/// decided before one lives in Setup. Nothing that would throw a running timer away happens on a
-/// single tap: Reset is held, and a new length or mode asks first. The surface is always dark.
+/// decided before one lives in Setup, all but the mode, which is on the surface itself. Nothing
+/// that would throw a running timer away happens on a single tap: Reset is held, and a new
+/// length or mode asks first. The surface is always dark.
 struct ControlView: View {
     @Environment(TimerModel.self) private var model
     @State private var sheet: ControlSheet?
@@ -39,8 +40,8 @@ struct ControlView: View {
     /// A phone, or an iPad on its end: one column, Setup behind a button.
     private var tall: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                LiveColumn(sheet: $sheet, showsSetupButton: true)
+            VStack(spacing: 24) {
+                LiveColumn(sheet: $sheet, showsHeader: true)
                 MessageCard()
             }
             .frame(maxWidth: 640)
@@ -55,13 +56,13 @@ struct ControlView: View {
     /// Landscape: the live column on the left, the message and Setup on the right.
     private func wide(_ size: CGSize) -> some View {
         HStack(alignment: .top, spacing: 24) {
-            LiveColumn(sheet: $sheet, showsSetupButton: false, showsHeader: size.height >= 430)
+            LiveColumn(sheet: $sheet, showsHeader: false)
                 .frame(width: (size.width - 72) * 0.6)
 
             ScrollView {
                 VStack(spacing: 18) {
                     MessageCard()
-                    SetupPanel(cardFill: Theme.surface, keyFill: Theme.raised) { sheet = $0 }
+                    SetupPanel(showsMode: true, cardFill: Theme.surface, keyFill: Theme.raised) { sheet = $0 }
                 }
                 .padding(.bottom, 24)
             }
